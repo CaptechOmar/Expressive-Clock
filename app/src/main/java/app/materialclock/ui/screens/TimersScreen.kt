@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Backspace
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.tween
@@ -353,7 +354,7 @@ private fun RunningTimer(
     // The ring moves in whole-second steps that match the readout, each one a short tween so it
     // reads as a tick rather than a jump, instead of sweeping continuously.
     val stepFraction = (secs.toFloat() / timer.total.seconds.coerceAtLeast(1L)).coerceIn(0f, 1f)
-    val ringFraction by animateFloatAsState(stepFraction, tween(180), label = "ringStep")
+    val ringFraction by animateFloatAsState(stepFraction, tween(450, easing = LinearOutSlowInEasing), label = "ringStep")
 
     // Digits go thin while paused and thicken again on resume, as in Google's timer.
     val digitWeight by animateIntAsState(
@@ -375,6 +376,7 @@ private fun RunningTimer(
             capHeight = ref,
             width = ClockFace.COUNTDOWN_WIDTH,
             weight = ClockFace.COUNTDOWN_WEIGHT,
+            roundness = ClockFace.COUNTDOWN_ROUNDNESS,
         )
         val measured = measurer.measure(text, refStyle).size.width.toDp()
         if (measured <= maxTextWidth) ref else ref * (maxTextWidth / measured)
@@ -411,6 +413,7 @@ private fun RunningTimer(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 width = ClockFace.COUNTDOWN_WIDTH,
                 weight = digitWeight,
+                roundness = ClockFace.COUNTDOWN_ROUNDNESS,
             )
         }
         Spacer(Modifier.weight(1f))
@@ -441,9 +444,10 @@ private fun RunningTimer(
             icon = Icons.Rounded.Close,
             onClick = onCancel,
             // The same colours as the stopwatch's Stop button, so the two "end this" actions read
-            // alike. Only the colour: the pill keeps its own shape and size.
-            container = MaterialTheme.colorScheme.errorContainer,
-            content = MaterialTheme.colorScheme.onErrorContainer,
+            // alike: Google's fixed red with a squarer corner, like its Stop button.
+            container = Color(0xFFFF716C),
+            content = Color(0xFF5C0A0A),
+            shape = RoundedCornerShape(30.dp),
             height = 78.dp,
         )
         Spacer(Modifier.height(10.dp))
