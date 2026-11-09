@@ -24,6 +24,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Backspace
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Pause
@@ -34,6 +37,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -346,6 +350,18 @@ private fun RunningTimer(
     }
     val running = timer.state == TimerState.RUNNING
 
+    // The ring moves in whole-second steps that match the readout, each one a short tween so it
+    // reads as a tick rather than a jump, instead of sweeping continuously.
+    val stepFraction = (secs.toFloat() / timer.total.seconds.coerceAtLeast(1L)).coerceIn(0f, 1f)
+    val ringFraction by animateFloatAsState(stepFraction, tween(180), label = "ringStep")
+
+    // Digits go thin while paused and thicken again on resume, as in Google's timer.
+    val digitWeight by animateIntAsState(
+        if (running) ClockFace.COUNTDOWN_WEIGHT else ClockFace.COUNTDOWN_PAUSED_WEIGHT,
+        tween(300),
+        label = "digitWeight",
+    )
+
     // The readout is fitted, not fixed. "25:00" and "1:05:00" are different widths and the second
     // one ran straight out of the ring: a timer set past an hour is exactly when you would not be
     // watching it closely, so it must not be the case that breaks. Measured against the chord
@@ -379,7 +395,7 @@ private fun RunningTimer(
             // on the screen for a readout that is supposed to be glanced at, and a thin quiet arc
             // lets the shrinking itself be the movement.
             CircularProgressIndicator(
-                progress = { timer.fractionLeft(nowElapsedMillis) },
+                progress = { ringFraction },
                 modifier = Modifier.size(RING_SIZE_DP.dp),
                 color = MaterialTheme.colorScheme.primary,
                 trackColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
@@ -394,7 +410,7 @@ private fun RunningTimer(
                 // digits are read against it.
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 width = ClockFace.COUNTDOWN_WIDTH,
-                weight = ClockFace.COUNTDOWN_WEIGHT,
+                weight = digitWeight,
             )
         }
         Spacer(Modifier.weight(1f))
@@ -426,8 +442,8 @@ private fun RunningTimer(
             onClick = onCancel,
             // The same colours as the stopwatch's Stop button, so the two "end this" actions read
             // alike. Only the colour: the pill keeps its own shape and size.
-            container = MaterialTheme.colorScheme.tertiaryContainer,
-            content = MaterialTheme.colorScheme.onTertiaryContainer,
+            container = MaterialTheme.colorScheme.errorContainer,
+            content = MaterialTheme.colorScheme.onErrorContainer,
             height = 78.dp,
         )
         Spacer(Modifier.height(10.dp))

@@ -91,6 +91,9 @@ object ClockFace {
     const val COUNTDOWN_WIDTH = 72f
     const val COUNTDOWN_WEIGHT = 330
 
+    /** Thinner weight the countdown digits take while the timer is paused. */
+    const val COUNTDOWN_PAUSED_WEIGHT = 190
+
     /**
      * Armed. Measured, not picked: the armed stem measures 0.0639 of the cap height in the render,
      * and this binary hits it at `wght` 261 with `opsz` 144 / `wdth` 25 (Brent-solved, then
