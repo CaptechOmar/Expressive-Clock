@@ -4,6 +4,9 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+// Set by CI (`-PclockBuild=<run number>`); absent on a local build.
+val clockBuild = (findProperty("clockBuild") as String?)?.toIntOrNull()
+
 android {
     namespace = "app.materialclock"
     compileSdk = 37
@@ -12,7 +15,9 @@ android {
         applicationId = "app.materialclock"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
+        // CI passes its run number as `clockBuild`, so every published beta has a higher version
+        // code than the last and Android treats the next one as an update. Local builds get 1.
+        versionCode = clockBuild ?: 1
         versionName = "0.1.0"
     }
 
@@ -46,6 +51,22 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+        }
+        /**
+         * What gets published as a beta release: the optimised release build, signed with the one
+         * permanent key, under its own application id.
+         *
+         * The separate id (`.beta`) matters. It installs beside the debug build and beside any
+         * other copy of the app, and it keeps its own data, so updating a beta never touches them
+         * and they never block it. The permanent key matters more: Android only updates an app in
+         * place when the new APK is signed with the same key, and CI's own debug key is generated
+         * fresh on every run, which is why every earlier build had to be uninstalled first.
+         */
+        create("beta") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".beta"
+            versionNameSuffix = "-beta" + (clockBuild?.let { ".$it" } ?: "")
+            matchingFallbacks += "release"
         }
         debug {
             applicationIdSuffix = ".debug"

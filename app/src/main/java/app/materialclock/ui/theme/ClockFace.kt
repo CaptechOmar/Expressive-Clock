@@ -77,6 +77,27 @@ object ClockFace {
     const val TIMER_WEIGHT = 490
 
     /**
+     * The running timer's countdown, measured off a screen recording of Google's own Clock timer
+     * (frames at 1080 px wide): digits 150 px tall, a `0` 82 px wide with a 13 px stem. That is an
+     * ink width of 0.55 of the height and a stem of 0.087 of it, so noticeably lighter and
+     * narrower than [TIMER_WIDTH] / [TIMER_WEIGHT], with a plain zero rather than a slashed one.
+     *
+     * Solved against the same two anchor measurements as the constants above (`0` ink width 0.234
+     * of the height at `wdth` 25 and 0.699 at 100; stem 0.0639 at `wght` 261 and 0.139 at 490),
+     * which gives `wdth` about 72 and `wght` about 330. Approximate, because the stem also moves
+     * with optical size, so if the digits look a touch heavy or wide on the phone these two numbers
+     * are the whole adjustment.
+     */
+    const val COUNTDOWN_WIDTH = 72f
+    const val COUNTDOWN_WEIGHT = 330
+
+    /** Fully rounded stroke ends (the font's ROND axis), as in Google's timer digits. */
+    const val COUNTDOWN_ROUNDNESS = 100f
+
+    /** Thinner weight the countdown digits take while the timer is paused. */
+    const val COUNTDOWN_PAUSED_WEIGHT = 190
+
+    /**
      * Armed. Measured, not picked: the armed stem measures 0.0639 of the cap height in the render,
      * and this binary hits it at `wght` 261 with `opsz` 144 / `wdth` 25 (Brent-solved, then
      * verified by two independent rasterisers). The value is opsz-dependent, so do not quote it
@@ -179,6 +200,7 @@ object ClockFace {
         tabular: Boolean = true,
         tracking: Float = 0f,
         slashedZero: Boolean = false,
+        roundness: Float = 0f,
     ): TextStyle = TextStyle(
         // opsz tracks the type size, clamped at the font's 144 max. Every one of the 30
         // documented styles sets opsz equal to its point size; the Do is explicit.
@@ -186,6 +208,7 @@ object ClockFace {
             opticalSize = fontSizeFor(capHeight).value,
             width = width,
             weight = weight,
+            roundness = roundness,
         ),
         fontSize = fontSizeFor(capHeight).value.sp,
         letterSpacing = tracking.em,
@@ -425,8 +448,9 @@ fun Numerals(
     tabular: Boolean = true,
     tracking: Float = 0f,
     slashedZero: Boolean = false,
+    roundness: Float = 0f,
 ) {
-    val style = ClockFace.numerals(capHeight, width, weight, tabular, tracking, slashedZero)
+    val style = ClockFace.numerals(capHeight, width, weight, tabular, tracking, slashedZero, roundness)
         .copy(color = color)
     InkTight(text, style, capHeight, modifier)
 }

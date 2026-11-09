@@ -167,6 +167,7 @@ fun WidePill(
     content: Color = MaterialTheme.colorScheme.onPrimaryContainer,
     icon: ImageVector? = null,
     outlined: Boolean = false,
+    shape: androidx.compose.ui.graphics.Shape = CircleShape,
     // Only the primary action gets the extra-large treatment. The concept's timer screen has
     // exactly one button; giving every secondary action 136 dp overflows the screen and Compose
     // then squeezes them all, which looks worse than either size chosen deliberately.
@@ -197,7 +198,7 @@ fun WidePill(
     androidx.compose.material3.Button(
         onClick = onClick,
         modifier = modifier.then(if (fillWidth) Modifier.fillMaxWidth() else Modifier).height(height),
-        shape = CircleShape,
+        shape = shape,
         colors = androidx.compose.material3.ButtonDefaults.buttonColors(
             containerColor = if (outlined) Color.Transparent else container,
             contentColor = content,

@@ -60,8 +60,8 @@ import kotlin.math.roundToInt
  *
  * ## Centring
  *
- * The **group** is centred, not the pill. Timers and Stopwatch have nothing to add, so when the
- * add button leaves, the row narrows and the pill glides right into the middle of the screen on
+ * The **group** is centred, not the pill. The Stopwatch (and a running timer) have nothing to add,
+ * so when the add button leaves, the row narrows and the pill glides right into the middle of the screen on
  * its own, with no second layout to maintain. That works only because [PlusButton] animates its
  * *reported width*, not just its drawing; a button that merely faded would leave the pill sitting
  * off-centre beside a hole.
@@ -177,7 +177,7 @@ private fun DockItem(tab: Tab, selected: Boolean, dark: Boolean, onClick: () -> 
             exit = fadeOut() + shrinkHorizontally(clip = false),
         ) {
             Text(
-                text = tab.label,
+                text = tab.dockLabel,
                 style = MaterialTheme.typography.labelLargeEmphasized,
                 color = content,
                 maxLines = 1,

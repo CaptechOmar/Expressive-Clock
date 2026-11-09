@@ -51,6 +51,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.materialclock.alarm.Notifications
 import app.materialclock.core.Alarm
+import app.materialclock.core.TimerPreset
 import app.materialclock.ui.screens.AlarmsScreen
 import app.materialclock.ui.screens.StopwatchScreen
 import app.materialclock.ui.screens.TimersScreen
@@ -58,6 +59,7 @@ import app.materialclock.ui.screens.WorldClockScreen
 import app.materialclock.ui.sheets.AddCitySheet
 import app.materialclock.ui.sheets.AlarmEditSheet
 import app.materialclock.ui.sheets.AlarmSettingsSheet
+import app.materialclock.ui.sheets.PresetSheet
 import app.materialclock.ui.sheets.StopwatchSettingsSheet
 import app.materialclock.ui.sheets.TimerSettingsSheet
 import app.materialclock.ui.sheets.WorldSettingsSheet
@@ -77,9 +79,19 @@ private val DOCK_CLEARANCE = 20.dp
  */
 private val DOCK_RESERVE = DOCK_HEIGHT + DOCK_CLEARANCE + 12.dp
 
-enum class Tab(val label: String, val icon: ImageVector, val key: String) {
+/**
+ * [label] is the tab's full name, used for the page title and by screen readers. [dockLabel] is what
+ * the dock shows beside the selected icon, and can be shorter: "World Clock" there was wide enough
+ * to squeeze the add button down to a sliver.
+ */
+enum class Tab(
+    val label: String,
+    val icon: ImageVector,
+    val key: String,
+    val dockLabel: String = label,
+) {
     ALARMS("Alarms", Icons.Outlined.Alarm, Notifications.TAB_ALARMS),
-    WORLD("World Clock", Icons.Outlined.Public, "world"),
+    WORLD("World Clock", Icons.Outlined.Public, "world", dockLabel = "World"),
     TIMERS("Timers", Icons.Outlined.HourglassEmpty, Notifications.TAB_TIMERS),
     STOPWATCH("Stopwatch", Icons.Outlined.Timer, Notifications.TAB_STOPWATCH),
 }
@@ -108,6 +120,10 @@ fun ClockApp(startTab: String? = null, vm: ClockViewModel = viewModel()) {
         var editing by remember { mutableStateOf<Alarm?>(null) }
         var showSettings by remember { mutableStateOf(false) }
         var addingCity by remember { mutableStateOf(false) }
+        var editingPreset by remember { mutableStateOf<TimerPreset?>(null) }
+        // Read here as well as inside the Timers tab: the dock's add button has to know whether
+        // the setting screen (where presets live) is the one being shown.
+        val activeTimer by vm.timer.collectAsStateWithLifecycle()
         val snackbar = remember { SnackbarHostState() }
         val scope = rememberCoroutineScope()
 
@@ -209,6 +225,7 @@ fun ClockApp(startTab: String? = null, vm: ClockViewModel = viewModel()) {
                                     if (r == SnackbarResult.ActionPerformed) vm.addCity(city)
                                 }
                             },
+                            onReorder = vm::reorderCities,
                             contentPadding = edgeToEdge,
                         )
                     }
@@ -217,14 +234,18 @@ fun ClockApp(startTab: String? = null, vm: ClockViewModel = viewModel()) {
                         val timer by vm.timer.collectAsStateWithLifecycle()
                         // Only tick while a timer exists; the setting screen has nothing moving.
                         val now by rememberElapsedTicker(active = timer != null)
+                        val presets by vm.presets.collectAsStateWithLifecycle()
                         TimersScreen(
                             timer = timer,
                             draft = vm.draftDuration,
+                            presets = presets,
                             nowElapsedMillis = now,
                             onDigit = vm::pressDigit,
                             onBackspace = vm::backspace,
                             onWind = vm::windToMinutes,
                             onStart = { vm.startTimer() },
+                            onPreset = vm::startPreset,
+                            onEditPreset = { editingPreset = it },
                             onPauseResume = { vm.pauseOrResumeTimer() },
                             onAddTen = { vm.addTenSeconds() },
                             onCancel = { vm.cancelTimer() },
@@ -251,11 +272,23 @@ fun ClockApp(startTab: String? = null, vm: ClockViewModel = viewModel()) {
                 destinations = Tab.entries,
                 selected = tab,
                 onSelect = { tab = it },
-                // Timers and Stopwatch have nothing to add: you create those with the controls on
-                // the screen itself. The button therefore leaves rather than sitting there inert.
-                showAdd = tab == Tab.ALARMS || tab == Tab.WORLD,
-                addLabel = if (tab == Tab.WORLD) "Add city" else "Add alarm",
-                onAdd = { if (tab == Tab.WORLD) addingCity = true else editing = vm.blankAlarm() },
+                // Alarms, cities and timer presets are lists you add to. Stopwatch has nothing to
+                // add, and neither does a timer that is already running (the presets are on the
+                // setting screen), so the button leaves rather than sitting there inert.
+                showAdd = tab == Tab.ALARMS || tab == Tab.WORLD ||
+                    (tab == Tab.TIMERS && activeTimer == null),
+                addLabel = when (tab) {
+                    Tab.WORLD -> "Add city"
+                    Tab.TIMERS -> "Add timer preset"
+                    else -> "Add alarm"
+                },
+                onAdd = {
+                    when (tab) {
+                        Tab.WORLD -> addingCity = true
+                        Tab.TIMERS -> editingPreset = vm.presetFromDraft()
+                        else -> editing = vm.blankAlarm()
+                    }
+                },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .navigationBarsPadding()
@@ -271,6 +304,15 @@ fun ClockApp(startTab: String? = null, vm: ClockViewModel = viewModel()) {
                 onDismiss = { editing = null },
                 onSave = { vm.saveAlarm(it) },
                 onDelete = if (draft.id == 0L) null else ({ id -> vm.deleteAlarm(id) }),
+            )
+        }
+
+        editingPreset?.let { draft ->
+            PresetSheet(
+                initial = draft,
+                onDismiss = { editingPreset = null },
+                onSave = { vm.savePreset(it) },
+                onDelete = if (draft.id == 0L) null else ({ id -> vm.deletePreset(id) }),
             )
         }
 

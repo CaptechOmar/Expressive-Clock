@@ -13,6 +13,7 @@ import app.materialclock.core.Alarm
 import app.materialclock.core.ClockTimer
 import app.materialclock.core.Lap
 import app.materialclock.core.Stopwatch
+import app.materialclock.core.TimerPreset
 import app.materialclock.core.TimerState
 import app.materialclock.core.WorldCity
 import app.materialclock.ui.theme.Palette
@@ -54,6 +55,9 @@ class ClockStore(private val context: Context) {
         p[KEY_CITIES]?.let(::parseCities) ?: SEED_CITIES
     }
     val timer: Flow<ClockTimer?> = context.prefs.data.map { p -> p[KEY_TIMER]?.let(::parseTimer) }
+    val presets: Flow<List<TimerPreset>> = context.prefs.data.map { p ->
+        p[KEY_PRESETS]?.let(::parsePresets) ?: emptyList()
+    }
     val stopwatch: Flow<Stopwatch> = context.prefs.data.map { p ->
         p[KEY_STOPWATCH]?.let(::parseStopwatch) ?: Stopwatch()
     }
@@ -73,6 +77,12 @@ class ClockStore(private val context: Context) {
 
     suspend fun putTimer(t: ClockTimer?) {
         context.prefs.edit { p -> if (t == null) p.remove(KEY_TIMER) else p[KEY_TIMER] = encodeTimer(t) }
+    }
+
+    suspend fun presetsNow(): List<TimerPreset> = presets.first()
+
+    suspend fun putPresets(list: List<TimerPreset>) {
+        context.prefs.edit { it[KEY_PRESETS] = encodePresets(list) }
     }
 
     suspend fun putStopwatch(s: Stopwatch) {
@@ -154,6 +164,7 @@ class ClockStore(private val context: Context) {
         val KEY_ALARMS = stringPreferencesKey("alarms")
         val KEY_CITIES = stringPreferencesKey("cities")
         val KEY_TIMER = stringPreferencesKey("timer")
+        val KEY_PRESETS = stringPreferencesKey("timerPresets")
         val KEY_STOPWATCH = stringPreferencesKey("stopwatch")
         val KEY_NEXT_ID = longPreferencesKey("nextId")
 
@@ -360,6 +371,23 @@ private fun parseTimer(s: String): ClockTimer? = runCatching {
         pausedRemaining = Duration.ofMillis(o.getLong("paused")),
     )
 }.getOrNull()
+
+private fun encodePresets(list: List<TimerPreset>) = JSONArray().apply {
+    list.forEach {
+        put(JSONObject().put("id", it.id).put("name", it.name).put("millis", it.duration.toMillis()))
+    }
+}.toString()
+
+/** Drops a malformed row rather than the whole list, like [parseCities]. */
+private fun parsePresets(s: String): List<TimerPreset> = runCatching {
+    val arr = JSONArray(s)
+    (0 until arr.length()).mapNotNull { i ->
+        runCatching {
+            val o = arr.getJSONObject(i)
+            TimerPreset(o.getLong("id"), o.getString("name"), Duration.ofMillis(o.getLong("millis")))
+        }.getOrNull()
+    }
+}.getOrDefault(emptyList())
 
 private fun encodeStopwatch(s: Stopwatch) = JSONObject()
     .put("running", s.running)
