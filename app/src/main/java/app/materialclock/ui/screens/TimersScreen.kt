@@ -28,19 +28,17 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material3.CircularWavyProgressIndicator
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.WavyProgressIndicatorDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
@@ -62,9 +60,9 @@ import java.time.Duration
  * shape for it. It and the keypad drive the same value, so you can type an exact 90 seconds or
  * wind roughly to twenty minutes, whichever the moment calls for.
  *
- * **Running** is a wavy circular ring with the remaining time inside it, and two controls: pause
- * and +10 s. `CircularWavyProgressIndicator` is genuinely expressive rather than a restyled
- * baseline ring, and the wave is the one thing on the screen in motion.
+ * **Running** is a plain circular ring with the remaining time inside it, and three controls:
+ * pause, +10 s and cancel. The ring and the digits follow Google's own timer: a thin arc that
+ * shrinks smoothly toward 12 o'clock, and light, narrow numerals.
  *
  * A null timer *is* the setting state. There is no mode flag to fall out of step with the UI.
  */
@@ -359,9 +357,8 @@ private fun RunningTimer(
         val ref = 62.dp
         val refStyle = ClockFace.numerals(
             capHeight = ref,
-            width = ClockFace.TIMER_WIDTH,
-            weight = ClockFace.TIMER_WEIGHT,
-            slashedZero = true,
+            width = ClockFace.COUNTDOWN_WIDTH,
+            weight = ClockFace.COUNTDOWN_WEIGHT,
         )
         val measured = measurer.measure(text, refStyle).size.width.toDp()
         if (measured <= maxTextWidth) ref else ref * (maxTextWidth / measured)
@@ -373,33 +370,31 @@ private fun RunningTimer(
     ) {
         Spacer(Modifier.weight(1f))
         Box(contentAlignment = Alignment.Center) {
-            CircularWavyProgressIndicator(
+            // A plain ring, like Google's own timer: the bright arc is the time that is left,
+            // anchored at 12 o'clock and running clockwise, and the faded arc is the time already
+            // used, with a small gap and round ends where the two meet. The sweep is continuous,
+            // not stepped once a second, because `fractionLeft` is read every frame.
+            //
+            // The earlier ring was a wavy one with its own drifting wave. It was the busiest thing
+            // on the screen for a readout that is supposed to be glanced at, and a thin quiet arc
+            // lets the shrinking itself be the movement.
+            CircularProgressIndicator(
                 progress = { timer.fractionLeft(nowElapsedMillis) },
                 modifier = Modifier.size(RING_SIZE_DP.dp),
                 color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                stroke = Stroke(width = with(LocalDensity.current) { 18.dp.toPx() }, cap = StrokeCap.Round),
-                trackStroke = Stroke(width = with(LocalDensity.current) { 18.dp.toPx() }, cap = StrokeCap.Round),
-                gapSize = 10.dp,
-                // Retuned for the size it is actually drawn at. The defaults come from
-                // CircularProgressIndicatorTokens, which describe a **40 dp** indicator: 15 dp
-                // wavelength, 1.6 dp amplitude, 4 dp stroke. Rendered at 300 dp with those, the
-                // circumference fits about 63 waves and the amplitude is under a percent of the
-                // radius, which is why it read as a fuzzy edge rather than a wave. At 76 dp the
-                // ring carries about twelve, each big enough to see.
-                wavelength = 76.dp,
-                amplitude = { if (running) 1f else 0f },
-                // The one thing on the screen that moves. A countdown that is visibly running is
-                // the entire point of the state, and a still ring made it look paused.
-                waveSpeed = if (running) 28.dp else 0.dp,
+                trackColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
+                strokeWidth = 11.dp,
+                strokeCap = StrokeCap.Round,
+                gapSize = 8.dp,
             )
             Numerals(
                 text = text,
                 capHeight = capHeight,
-                color = MaterialTheme.colorScheme.onSurface,
-                width = ClockFace.TIMER_WIDTH,
-                weight = ClockFace.TIMER_WEIGHT,
-                slashedZero = true,
+                // Softer than the ring, as in the recording: the arc is the loud part and the
+                // digits are read against it.
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                width = ClockFace.COUNTDOWN_WIDTH,
+                weight = ClockFace.COUNTDOWN_WEIGHT,
             )
         }
         Spacer(Modifier.weight(1f))
@@ -429,8 +424,10 @@ private fun RunningTimer(
             text = "Cancel",
             icon = Icons.Rounded.Close,
             onClick = onCancel,
-            outlined = true,
-            content = MaterialTheme.colorScheme.onSurfaceVariant,
+            // The same colours as the stopwatch's Stop button, so the two "end this" actions read
+            // alike. Only the colour: the pill keeps its own shape and size.
+            container = MaterialTheme.colorScheme.tertiaryContainer,
+            content = MaterialTheme.colorScheme.onTertiaryContainer,
             height = 78.dp,
         )
         Spacer(Modifier.height(10.dp))
