@@ -177,7 +177,7 @@ private fun DockItem(tab: Tab, selected: Boolean, dark: Boolean, onClick: () -> 
             exit = fadeOut() + shrinkHorizontally(clip = false),
         ) {
             Text(
-                text = tab.label,
+                text = tab.dockLabel,
                 style = MaterialTheme.typography.labelLargeEmphasized,
                 color = content,
                 maxLines = 1,

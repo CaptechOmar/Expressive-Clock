@@ -79,9 +79,19 @@ private val DOCK_CLEARANCE = 20.dp
  */
 private val DOCK_RESERVE = DOCK_HEIGHT + DOCK_CLEARANCE + 12.dp
 
-enum class Tab(val label: String, val icon: ImageVector, val key: String) {
+/**
+ * [label] is the tab's full name, used for the page title and by screen readers. [dockLabel] is what
+ * the dock shows beside the selected icon, and can be shorter: "World Clock" there was wide enough
+ * to squeeze the add button down to a sliver.
+ */
+enum class Tab(
+    val label: String,
+    val icon: ImageVector,
+    val key: String,
+    val dockLabel: String = label,
+) {
     ALARMS("Alarms", Icons.Outlined.Alarm, Notifications.TAB_ALARMS),
-    WORLD("World Clock", Icons.Outlined.Public, "world"),
+    WORLD("World Clock", Icons.Outlined.Public, "world", dockLabel = "World"),
     TIMERS("Timers", Icons.Outlined.HourglassEmpty, Notifications.TAB_TIMERS),
     STOPWATCH("Stopwatch", Icons.Outlined.Timer, Notifications.TAB_STOPWATCH),
 }
