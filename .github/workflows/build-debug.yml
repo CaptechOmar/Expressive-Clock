@@ -17,8 +17,12 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      # Installs the Android SDK and accepts its licences, so Gradle can fetch compileSdk 37.
+      # The runner already has an SDK. This step is only here to accept the licences so Gradle
+      # can download compileSdk 37. `packages: ''` skips the action's default `tools` package,
+      # which no longer exists and made the previous run fail.
       - uses: android-actions/setup-android@v3
+        with:
+          packages: ''
 
       - uses: gradle/actions/setup-gradle@v4
 
