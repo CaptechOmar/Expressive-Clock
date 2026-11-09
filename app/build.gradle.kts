@@ -18,7 +18,8 @@ android {
         // CI passes its run number as `clockBuild`, so every published beta has a higher version
         // code than the last and Android treats the next one as an update. Local builds get 1.
         versionCode = clockBuild ?: 1
-        versionName = "0.1.0"
+        // CI passes the tag (v1.0.0 -> 1.0.0) as `clockVersion` for stable releases.
+        versionName = (findProperty("clockVersion") as String?) ?: "0.1.0"
     }
 
     /**
