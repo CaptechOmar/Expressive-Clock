@@ -20,7 +20,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
@@ -90,6 +92,7 @@ fun Winder(
     val ridge = MaterialTheme.colorScheme.onSurfaceVariant
     val track = MaterialTheme.colorScheme.surfaceContainerHighest
     val onChange by rememberUpdatedState(onValueChange)
+    val haptics = LocalHapticFeedback.current
 
     var pos by remember { mutableFloatStateOf(value.toFloat()) }
     // What this control last reported. An incoming `value` equal to it is our own echo.
@@ -111,7 +114,7 @@ fun Winder(
                     steps = range.last - range.first,
                 )
             }
-            .pointerInput(range) {
+            .pointerInput(range, haptics) {
                 detectHorizontalDragGestures(
                     // Snap. Let go between two graduations and the drum settles onto the nearer
                     // one rather than resting off-detent, which is what a real wound dial does
@@ -150,6 +153,19 @@ fun Winder(
                     if (rounded != emitted) {
                         emitted = rounded
                         onChange(rounded)
+                        // One click each time a graduation passes under the marker, the way a
+                        // knurled wheel ratchets. The lighter "frequent" tick is for the ordinary
+                        // graduations and the firmer one lands on every `majorEvery`th, which are
+                        // the ones drawn in the accent colour, so the fives can be felt as well as
+                        // seen. Once per touch event, not once per unit crossed: a fast fling
+                        // skips graduations on screen and should skip them under the thumb too.
+                        haptics.performHapticFeedback(
+                            if (rounded % majorEvery == 0) {
+                                HapticFeedbackType.SegmentTick
+                            } else {
+                                HapticFeedbackType.SegmentFrequentTick
+                            }
+                        )
                     }
                 }
             },

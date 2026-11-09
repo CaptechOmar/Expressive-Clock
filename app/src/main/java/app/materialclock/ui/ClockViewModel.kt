@@ -19,6 +19,7 @@ import app.materialclock.core.Alarm
 import app.materialclock.core.ClockTimer
 import app.materialclock.core.Lap
 import app.materialclock.core.Stopwatch
+import app.materialclock.core.TimerPreset
 import app.materialclock.core.TimerState
 import app.materialclock.core.WorldCity
 import app.materialclock.data.ClockSettings
@@ -93,6 +94,8 @@ class ClockViewModel(app: Application) : AndroidViewModel(app) {
         store.cities.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val timer: StateFlow<ClockTimer?> =
         store.timer.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    val presets: StateFlow<List<TimerPreset>> =
+        store.presets.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val stopwatch: StateFlow<Stopwatch> =
         store.stopwatch.stateIn(viewModelScope, SharingStarted.Eagerly, Stopwatch())
 
@@ -194,9 +197,13 @@ class ClockViewModel(app: Application) : AndroidViewModel(app) {
         timerDigits = if (minutes <= 0) "" else "%d%02d00".format(minutes / 60, minutes % 60).trimStart('0')
     }
 
-    fun startTimer(label: String = "Timer") = viewModelScope.launch {
-        val total = draftDuration
-        if (total.isZero) return@launch
+    fun startTimer(label: String = "Timer") = viewModelScope.launch { begin(label, draftDuration) }
+
+    /** One tap on a saved preset: starts it now, under its own name. */
+    fun startPreset(preset: TimerPreset) = viewModelScope.launch { begin(preset.name, preset.duration) }
+
+    private suspend fun begin(label: String, total: Duration) {
+        if (total.isZero) return
         val t = ClockTimer(
             id = store.nextId(),
             label = label,
@@ -207,6 +214,27 @@ class ClockViewModel(app: Application) : AndroidViewModel(app) {
         timerDigits = ""
         store.putTimer(t)
         TimerScheduler.sync(ctx, t)
+    }
+
+    /* ── Timer presets ──────────────────────────────────────────────────────────────────────── */
+
+    /** What the add button opens the sheet with: whatever is already typed on the keypad. */
+    fun presetFromDraft(): TimerPreset = TimerPreset(id = 0L, name = "", duration = draftDuration)
+
+    /** Insert or replace, the same convention as [saveAlarm]: an id of 0 means "new". */
+    fun savePreset(draft: TimerPreset) = viewModelScope.launch {
+        if (draft.duration.isZero) return@launch
+        val id = if (draft.id == 0L) store.nextId() else draft.id
+        val preset = draft.copy(id = id)
+        val current = store.presetsNow()
+        store.putPresets(
+            if (current.any { it.id == id }) current.map { if (it.id == id) preset else it }
+            else current + preset
+        )
+    }
+
+    fun deletePreset(id: Long) = viewModelScope.launch {
+        store.putPresets(store.presetsNow().filterNot { it.id == id })
     }
 
     fun pauseOrResumeTimer() = viewModelScope.launch {

@@ -4,18 +4,24 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Backspace
 import androidx.compose.material.icons.rounded.Add
@@ -31,15 +37,18 @@ import androidx.compose.material3.WavyProgressIndicatorDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import app.materialclock.core.ClockTimer
+import app.materialclock.core.TimerPreset
 import app.materialclock.core.TimerState
 import app.materialclock.ui.theme.ClockFace
 import app.materialclock.ui.theme.Numerals
@@ -66,11 +75,14 @@ private const val RING_SIZE_DP = 300
 fun TimersScreen(
     timer: ClockTimer?,
     draft: Duration,
+    presets: List<TimerPreset>,
     nowElapsedMillis: Long,
     onDigit: (Char) -> Unit,
     onBackspace: () -> Unit,
     onWind: (Int) -> Unit,
     onStart: () -> Unit,
+    onPreset: (TimerPreset) -> Unit,
+    onEditPreset: (TimerPreset) -> Unit,
     onPauseResume: () -> Unit,
     onAddTen: () -> Unit,
     onCancel: () -> Unit,
@@ -86,7 +98,7 @@ fun TimersScreen(
         if (running && timer != null) {
             RunningTimer(timer, nowElapsedMillis, onPauseResume, onAddTen, onCancel)
         } else {
-            SetTimer(draft, onDigit, onBackspace, onWind, onStart)
+            SetTimer(draft, presets, onDigit, onBackspace, onWind, onStart, onPreset, onEditPreset)
         }
     }
 }
@@ -96,10 +108,13 @@ fun TimersScreen(
 @Composable
 private fun SetTimer(
     draft: Duration,
+    presets: List<TimerPreset>,
     onDigit: (Char) -> Unit,
     onBackspace: () -> Unit,
     onWind: (Int) -> Unit,
     onStart: () -> Unit,
+    onPreset: (TimerPreset) -> Unit,
+    onEditPreset: (TimerPreset) -> Unit,
 ) {
     val total = draft.seconds
     val hh = "%02d".format(total / 3600)
@@ -140,7 +155,72 @@ private fun SetTimer(
                 MaterialTheme.colorScheme.onSurfaceVariant
             },
         )
+        // Saved timers live under Start. They are added with the dock's plus button.
+        if (presets.isNotEmpty()) {
+            Spacer(Modifier.height(14.dp))
+            PresetRow(presets, onPreset, onEditPreset)
+        }
         Spacer(Modifier.height(10.dp))
+    }
+}
+
+/**
+ * Saved timers as pills, scrolling sideways when there are more than fit.
+ *
+ * Tap starts the timer under the preset's name; long-press opens it for editing or deleting.
+ */
+@Composable
+private fun PresetRow(
+    presets: List<TimerPreset>,
+    onPreset: (TimerPreset) -> Unit,
+    onEditPreset: (TimerPreset) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        presets.forEach { p ->
+            PresetPill(p, onClick = { onPreset(p) }, onLongClick = { onEditPreset(p) })
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun PresetPill(preset: TimerPreset, onClick: () -> Unit, onLongClick: () -> Unit) {
+    val shape = RoundedCornerShape(28.dp)
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        shape = shape,
+        modifier = Modifier
+            .clip(shape)
+            .combinedClickable(
+                onClickLabel = "Start ${preset.name}",
+                onClick = onClick,
+                onLongClickLabel = "Edit ${preset.name}",
+                onLongClick = onLongClick,
+            ),
+    ) {
+        Column(
+            modifier = Modifier
+                .defaultMinSize(minWidth = 88.dp)
+                .padding(horizontal = 24.dp, vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                preset.name,
+                style = MaterialTheme.typography.titleMediumEmphasized,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                preset.durationLabel,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.75f),
+                maxLines = 1,
+            )
+        }
     }
 }
 

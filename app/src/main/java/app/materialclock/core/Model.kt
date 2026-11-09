@@ -157,6 +157,29 @@ data class ClockTimer(
     }
 }
 
+/**
+ * A saved timer: a name and a length, nothing running.
+ *
+ * Kept apart from [ClockTimer] on purpose. A preset is a template you start from, and a timer is one
+ * instance of it counting down, so a preset has no state and no deadline to fall out of step with.
+ */
+data class TimerPreset(
+    val id: Long,
+    val name: String,
+    val duration: Duration,
+) {
+    /** "25 min", "1 h 30 min", "1 min 30 s": only the parts that are not zero. */
+    val durationLabel: String
+        get() {
+            val s = duration.seconds
+            return listOfNotNull(
+                "${s / 3600} h".takeIf { s >= 3600 },
+                "${(s % 3600) / 60} min".takeIf { (s % 3600) / 60 > 0 },
+                "${s % 60} s".takeIf { s % 60 > 0 },
+            ).joinToString(" ").ifEmpty { "0 s" }
+        }
+}
+
 /** One completed lap: its own split, and the total elapsed at the moment it was taken. */
 data class Lap(val index: Int, val split: Duration, val total: Duration)
 
