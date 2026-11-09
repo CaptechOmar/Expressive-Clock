@@ -1,7 +1,9 @@
 package app.materialclock.ui.screens
 
+import androidx.compose.animation.core.animate
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -32,11 +35,22 @@ import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.zIndex
 import app.materialclock.data.HourFormat
 import app.materialclock.data.WorldClockSettings
 import androidx.compose.ui.Alignment
@@ -60,7 +74,10 @@ import app.materialclock.core.WorldCity
 import java.time.ZoneId
 import kotlin.math.PI
 import kotlin.math.cos
+import kotlin.math.floor
 import kotlin.math.sin
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * The world clock.
@@ -76,6 +93,27 @@ import kotlin.math.sin
  */
 private const val ROW_HEIGHT_DP = 128
 
+/** Gap between rows. The pitch a dragged row has to travel to swap places is height + gap. */
+private const val ROW_GAP_DP = 2
+
+private val DAY_BADGE = Color(0xFFFFD54F)
+private val NIGHT_BADGE = Color(0xFF7D83FD)
+
+/**
+ * The list is reorderable: press and hold a city, then drag it to a new place.
+ *
+ * ## How the drag works
+ *
+ * Every row is the same height, so the whole thing is arithmetic on one number, the **pitch** (row
+ * plus gap). The dragged row keeps its slot in a working copy of the list and is drawn displaced by
+ * [dragOffset]; when its centre crosses into a neighbour's slot the two swap in the working list
+ * and the offset is reduced by one pitch, so the row stays exactly under the finger while the
+ * neighbour animates into the space it left. No measured positions are read for the swap, which is
+ * what keeps a fast drag from acting on a layout that is a frame out of date.
+ *
+ * The order is written to the store once, on release. Until the store answers, [pending] holds the
+ * new order, so the list does not flash back to the old one for a frame.
+ */
 @Composable
 fun WorldClockScreen(
     cities: List<WorldCity>,
@@ -83,6 +121,7 @@ fun WorldClockScreen(
     nowUtcMillis: Long,
     settings: WorldClockSettings,
     onRemove: (WorldCity) -> Unit,
+    onReorder: (List<WorldCity>) -> Unit,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
@@ -92,14 +131,127 @@ fun WorldClockScreen(
         HourFormat.H24 -> true
     }
     val measurer = rememberTextMeasurer()
+    val listState = rememberLazyListState()
+    val haptics = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
+    val settleSpec = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
+    val pitchPx = with(LocalDensity.current) { (ROW_HEIGHT_DP + ROW_GAP_DP).dp.toPx() }
+
+    // The row being dragged, how far it is displaced from its slot, and whether a finger is still
+    // down. The key outlives the finger by the length of the settle animation.
+    var draggedKey by remember { mutableStateOf<String?>(null) }
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    var fingerDown by remember { mutableStateOf(false) }
+    var working by remember { mutableStateOf(cities) }
+    var pending by remember { mutableStateOf<List<WorldCity>?>(null) }
+
+    val shown = if (draggedKey != null) working else (pending ?: cities)
+
+    // The store has answered, so what it holds is now the truth. The timeout covers a write that
+    // was refused and so never produces a new list.
+    LaunchedEffect(cities) { pending = null }
+    LaunchedEffect(pending) {
+        if (pending != null) {
+            delay(1500)
+            pending = null
+        }
+    }
+
+    /** Swaps the dragged row with whichever slot its centre is now over. */
+    fun settle() {
+        val key = draggedKey ?: return
+        val from = working.indexOfFirst { it.zone.id == key }
+        if (from < 0) return
+        val centre = from * pitchPx + dragOffset + pitchPx / 2f
+        val to = floor(centre / pitchPx).toInt().coerceIn(0, working.lastIndex)
+        if (to != from) {
+            working = working.toMutableList().apply { add(to, removeAt(from)) }
+            dragOffset -= (to - from) * pitchPx
+            haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+        }
+    }
+
+    fun startDrag(key: String) {
+        if (draggedKey != null) return
+        working = pending ?: cities
+        dragOffset = 0f
+        draggedKey = key
+        fingerDown = true
+        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+    }
+
+    fun dragBy(dy: Float) {
+        if (draggedKey == null || !fingerDown) return
+        dragOffset += dy
+        settle()
+    }
+
+    fun endDrag() {
+        if (draggedKey == null || !fingerDown) return
+        fingerDown = false
+        scope.launch {
+            // Glide into the slot rather than snapping the last half-row.
+            animate(initialValue = dragOffset, targetValue = 0f, animationSpec = settleSpec) { v, _ ->
+                dragOffset = v
+            }
+            val result = working
+            draggedKey = null
+            if (result.map { it.zone.id } != cities.map { it.zone.id }) {
+                pending = result
+                onReorder(result)
+            }
+        }
+    }
+
+    /** The same move without a gesture, for a screen reader's custom actions. */
+    fun nudge(city: WorldCity, by: Int) {
+        val list = pending ?: cities
+        val from = list.indexOfFirst { it.zone.id == city.zone.id }
+        val to = from + by
+        if (from < 0 || to !in list.indices) return
+        val moved = list.toMutableList().apply { add(to, removeAt(from)) }
+        pending = moved
+        onReorder(moved)
+    }
+
+    // Edge scrolling. A drag has to be able to carry a row further than the screen shows, and it
+    // has to keep going while the finger is held still at the edge, so this runs on frames, not on
+    // touch events. The list moving under a stationary finger is a displacement the row has to
+    // make up, hence the offset grows by whatever the scroll consumed.
+    LaunchedEffect(draggedKey) {
+        val key = draggedKey ?: return@LaunchedEffect
+        while (true) {
+            withFrameNanos { }
+            if (!fingerDown) continue
+            val info = listState.layoutInfo
+            val item = info.visibleItemsInfo.firstOrNull { it.key == key } ?: continue
+            val top = item.offset + dragOffset
+            val bottom = top + item.size
+            val low = info.viewportStartOffset + info.beforeContentPadding
+            val high = info.viewportEndOffset - info.afterContentPadding
+            val margin = pitchPx * 0.25f
+            val step = pitchPx * 0.08f
+            val delta = when {
+                top < low + margin -> -step
+                bottom > high - margin -> step
+                else -> 0f
+            }
+            if (delta != 0f) {
+                dragOffset += listState.dispatchRawDelta(delta)
+                settle()
+            }
+        }
+    }
+
     LazyColumn(
+        state = listState,
         modifier = modifier.fillMaxSize(),
         contentPadding = contentPadding,
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+        verticalArrangement = Arrangement.spacedBy(ROW_GAP_DP.dp),
     ) {
         item {
             CityDial(
-                cities = cities,
+                cities = shown,
                 nowUtcMillis = nowUtcMillis,
                 measurer = measurer,
                 modifier = Modifier
@@ -110,7 +262,8 @@ fun WorldClockScreen(
                     .aspectRatio(1f),
             )
         }
-        items(cities, key = { it.zone.id }) { city ->
+        items(shown, key = { it.zone.id }) { city ->
+            val dragging = city.zone.id == draggedKey
             CityRow(
                 city = city,
                 home = home,
@@ -118,7 +271,22 @@ fun WorldClockScreen(
                 use24h = use24h,
                 showSeconds = settings.showSeconds,
                 onRemove = { onRemove(city) },
-                modifier = Modifier.animateItem(),
+                dragging = dragging,
+                onDragStart = { startDrag(city.zone.id) },
+                onDrag = { dy -> dragBy(dy) },
+                onDragEnd = { endDrag() },
+                onNudge = { by -> nudge(city, by) },
+                // The dragged row is placed by hand, so it must not also be animated into place:
+                // the two would fight, and the row would lag behind the finger.
+                modifier = if (dragging) {
+                    Modifier.zIndex(1f).graphicsLayer {
+                        translationY = dragOffset
+                        scaleX = 1.03f
+                        scaleY = 1.03f
+                    }
+                } else {
+                    Modifier.animateItem()
+                },
             )
         }
     }
@@ -212,10 +380,13 @@ private fun CityDial(
  * with a trailing bin, which is the standard destructive treatment and reads before the row has
  * travelled far enough to commit.
  *
- * It replaces a long-press and a confirmation dialog. The dialog was defensible while the gesture
- * was invisible; with a swipe, the gesture is deliberate enough to stand on its own, and the safety
- * net moves to an Undo snackbar. That is both the documented mitigation and less work to use than a
- * dialog you have to answer every time.
+ * It replaced a confirmation dialog. The dialog was defensible while the gesture was invisible; with
+ * a swipe, the gesture is deliberate enough to stand on its own, and the safety net moves to an
+ * Undo snackbar. That is both the documented mitigation and less work to use than a dialog you
+ * have to answer every time.
+ *
+ * Press and hold is the other gesture on the row: it picks the row up to be dragged to a new place
+ * in the list. The swipe is switched off while that is happening.
  */
 @OptIn(ExperimentalFoundationApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -226,8 +397,18 @@ private fun CityRow(
     use24h: Boolean,
     showSeconds: Boolean,
     onRemove: () -> Unit,
+    dragging: Boolean,
+    onDragStart: () -> Unit,
+    onDrag: (Float) -> Unit,
+    onDragEnd: () -> Unit,
+    onNudge: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // The gesture below is installed once per row, so it has to read the latest callbacks rather
+    // than the ones from the composition that created it.
+    val currentStart by rememberUpdatedState(onDragStart)
+    val currentDrag by rememberUpdatedState(onDrag)
+    val currentEnd by rememberUpdatedState(onDragEnd)
     val local = city.timeAt(nowUtcMillis)
     val night = city.isNight(nowUtcMillis)
     val clock = buildString {
@@ -260,6 +441,8 @@ private fun CityRow(
         // One swipe action per container, per the spec. Two directions doing the same thing is not
         // twice the affordance, it is a coin flip about whether the row came back.
         enableDismissFromStartToEnd = false,
+        // Off while the row is being carried, so a drag that wanders sideways cannot also delete it.
+        gesturesEnabled = !dragging,
         onDismiss = { onRemove() },
         backgroundContent = {
             Surface(
@@ -284,15 +467,30 @@ private fun CityRow(
         Surface(
             color = MaterialTheme.colorScheme.surfaceContainer,
             shape = RoundedCornerShape(percent = 50),
+            // Lifted while carried, which is what says it has been picked up.
+            shadowElevation = if (dragging) 12.dp else 0.dp,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
                 .height(ROW_HEIGHT_DP.dp)
+                .pointerInput(city.zone.id) {
+                    detectDragGesturesAfterLongPress(
+                        onDragStart = { currentStart() },
+                        onDrag = { change, amount ->
+                            change.consume()
+                            currentDrag(amount.y)
+                        },
+                        onDragEnd = { currentEnd() },
+                        onDragCancel = { currentEnd() },
+                    )
+                }
                 .semantics {
                     // A swipe is a gesture, and a gesture is invisible to a screen reader. The same
                     // action has to exist as a verb it can announce and perform.
                     customActions = listOf(
-                        CustomAccessibilityAction("Remove ${city.city}") { onRemove(); true }
+                        CustomAccessibilityAction("Remove ${city.city}") { onRemove(); true },
+                        CustomAccessibilityAction("Move ${city.city} up") { onNudge(-1); true },
+                        CustomAccessibilityAction("Move ${city.city} down") { onNudge(1); true },
                     )
                 },
         ) {
@@ -302,12 +500,11 @@ private fun CityRow(
         ) {
             // Day or night, not an initial. The initial says nothing you cannot read in the name
             // beside it; whether they are awake is the only thing a world clock is actually for.
+            //
+            // Fixed colours, not theme roles: the badge is the one thing on the row that should
+            // read the same whatever wallpaper the palette was drawn from.
             Surface(
-                color = if (night) {
-                    MaterialTheme.colorScheme.surfaceContainerHighest
-                } else {
-                    MaterialTheme.colorScheme.primaryContainer
-                },
+                color = if (night) NIGHT_BADGE else DAY_BADGE,
                 shape = CircleShape,
                 modifier = Modifier.size(51.dp),
             ) {
@@ -315,11 +512,7 @@ private fun CityRow(
                     Icon(
                         imageVector = if (night) Icons.Outlined.Bedtime else Icons.Outlined.LightMode,
                         contentDescription = if (night) "night" else "daytime",
-                        tint = if (night) {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        } else {
-                            MaterialTheme.colorScheme.onPrimaryContainer
-                        },
+                        tint = Color.Black,
                         modifier = Modifier.size(24.dp),
                     )
                 }

@@ -160,6 +160,19 @@ class ClockViewModel(app: Application) : AndroidViewModel(app) {
         if (current.none { it.zone == city.zone }) store.putCities(current + city)
     }
 
+    /**
+     * Saves a new order. Only a reshuffle of what is stored is accepted, so a drop that arrives
+     * after a city was removed (or added) cannot bring a deleted city back or drop a new one.
+     */
+    fun reorderCities(ordered: List<WorldCity>) = viewModelScope.launch {
+        val current = store.cities.first()
+        if (ordered.size == current.size &&
+            ordered.map { it.zone }.toSet() == current.map { it.zone }.toSet()
+        ) {
+            store.putCities(ordered)
+        }
+    }
+
     fun removeCity(zone: ZoneId) = viewModelScope.launch {
         store.putCities(store.cities.first().filterNot { it.zone == zone })
     }

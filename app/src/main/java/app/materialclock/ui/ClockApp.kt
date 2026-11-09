@@ -215,6 +215,7 @@ fun ClockApp(startTab: String? = null, vm: ClockViewModel = viewModel()) {
                                     if (r == SnackbarResult.ActionPerformed) vm.addCity(city)
                                 }
                             },
+                            onReorder = vm::reorderCities,
                             contentPadding = edgeToEdge,
                         )
                     }
