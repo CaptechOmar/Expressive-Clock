@@ -130,20 +130,14 @@ fun AlarmEditSheet(
         onDismiss()
     }
 
-    val ringtonePicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            val picked: Uri? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                result.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI, Uri::class.java)
-            } else {
-                @Suppress("DEPRECATION")
-                result.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
-            }
-            // A null pick is "Silent", which is a legitimate choice and must be distinguishable
-            // from "unset". Storing the literal string keeps that difference in one nullable field.
-            soundUri = picked?.toString() ?: SILENT
-        }
+    var showSounds by remember { mutableStateOf(false) }
+    if (showSounds) {
+        SoundPickerDialog(
+            title = "Alarm sound",
+            current = soundUri,
+            onPick = { soundUri = it },
+            onDismiss = { showSounds = false },
+        )
     }
 
     ModalBottomSheet(onDismissRequest = { commitAndClose() }, sheetState = sheetState) {
@@ -203,19 +197,7 @@ fun AlarmEditSheet(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 FilledTonalButton(
-                    onClick = {
-                        ringtonePicker.launch(
-                            Intent(RingtoneManager.ACTION_RINGTONE_PICKER)
-                                .putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
-                                .putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Alarm sound")
-                                .putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
-                                .putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true)
-                                .putExtra(
-                                    RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,
-                                    soundUri?.takeIf { it != SILENT }?.let(Uri::parse),
-                                )
-                        )
-                    },
+                    onClick = { showSounds = true },
                     contentPadding = PaddingValues(horizontal = 18.dp),
                     modifier = Modifier.weight(1f).height(ROW_H),
                 ) {
@@ -429,15 +411,7 @@ const val SHEET_MAX_FRACTION = 0.88f
 @Composable
 private fun ringtoneName(uri: String?): String {
     val context = LocalContext.current
-    return remember(uri) {
-        when {
-            uri == null -> "Default sound"
-            uri == SILENT -> "Silent"
-            else -> runCatching {
-                RingtoneManager.getRingtone(context, Uri.parse(uri))?.getTitle(context)
-            }.getOrNull() ?: "Default sound"
-        }
-    }
+    return remember(uri) { soundName(context, uri) }
 }
 
 /**

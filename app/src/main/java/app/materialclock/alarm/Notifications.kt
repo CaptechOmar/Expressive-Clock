@@ -6,6 +6,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Bundle
 import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -95,6 +96,13 @@ object Notifications {
             .addAction(0, "+1 min", broadcast(context, ClockActionReceiver.ACTION_TIMER_ADD, 21))
             .addAction(0, "Cancel", broadcast(context, ClockActionReceiver.ACTION_TIMER_CANCEL, 22))
 
+        // Paused only: a frozen bar is accurate, a bar posted once while the timer ticks would not be.
+        if (!running) {
+            val totalSec = timer.total.seconds.toInt().coerceAtLeast(1)
+            val leftSec = timer.pausedRemaining.seconds.toInt().coerceIn(0, totalSec)
+            b.setProgress(totalSec, totalSec - leftSec, false)
+        }
+
         if (running) {
             // The platform ticks this. `when` is the moment it reaches zero.
             b.setUsesChronometer(true)
@@ -106,6 +114,9 @@ object Notifications {
                 .setShowWhen(false)
                 .setContentText("Paused · ${timer.pausedRemaining.clockFormat()}")
         }
+        // Paused keeps its live-activity pill: a chronometer cannot be frozen, so the frozen time
+        // is handed over as the pill's own text instead.
+        promote(b, if (running) null else timer.pausedRemaining.clockFormat())
         post(context, ID_TIMER, b.build())
     }
 
@@ -148,11 +159,28 @@ object Notifications {
                 .setShowWhen(false)
                 .setContentText(sw.accumulated.clockFormat(withHours = true))
         }
+        promote(b, if (sw.running) null else sw.accumulated.clockFormat())
         post(context, ID_STOPWATCH, b.build())
     }
 
     fun hideStopwatch(context: Context) {
         NotificationManagerCompat.from(context).cancel(ID_STOPWATCH)
+    }
+
+    /**
+     * Opts a notification into Android 16 "Live Updates" (the status-bar chip and lock-screen
+     * promotion) and hands it the short text that chip shows when there is no chronometer.
+     *
+     * Set through the documented extras keys rather than builder methods so the same code compiles
+     * and is simply ignored on every older release. Launchers and Dynamic-Island-style apps key off
+     * the same ongoing + alarm-category + actions signals, which every notification here keeps.
+     */
+    fun promote(b: NotificationCompat.Builder, shortText: String? = null): NotificationCompat.Builder {
+        val extras = Bundle().apply {
+            putBoolean("android.requestPromotedOngoing", true)
+            if (shortText != null) putString("android.shortCriticalText", shortText)
+        }
+        return b.addExtras(extras)
     }
 
     /* ── Plumbing ───────────────────────────────────────────────────────────────────────────── */

@@ -186,7 +186,7 @@ class AlarmService : Service() {
         }
 
         private fun ringingNotification(context: Context, id: Long, label: String) =
-            NotificationCompat.Builder(context, Notifications.CHANNEL_ALARM)
+            Notifications.promote(NotificationCompat.Builder(context, Notifications.CHANNEL_ALARM), "Alarm")
                 .setSmallIcon(R.drawable.ic_stat_alarm)
                 .setContentTitle(label)
                 .setContentText("Alarm")
@@ -205,7 +205,7 @@ class AlarmService : Service() {
                 .build()
 
         private fun timerNotification(context: Context) =
-            NotificationCompat.Builder(context, Notifications.CHANNEL_ALARM)
+            Notifications.promote(NotificationCompat.Builder(context, Notifications.CHANNEL_ALARM), "Time's up")
                 .setSmallIcon(R.drawable.ic_stat_timer)
                 .setContentTitle("Timer")
                 .setContentText("Time's up")

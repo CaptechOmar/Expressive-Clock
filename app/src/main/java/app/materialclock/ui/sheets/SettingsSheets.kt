@@ -32,6 +32,10 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -346,18 +350,14 @@ fun TimerSettingsSheet(
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
-    val picker = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            val picked: Uri? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                result.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI, Uri::class.java)
-            } else {
-                @Suppress("DEPRECATION")
-                result.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
-            }
-            onChange { it.copy(timers = it.timers.copy(soundUri = picked?.toString() ?: SILENT)) }
-        }
+    var showSounds by remember { mutableStateOf(false) }
+    if (showSounds) {
+        SoundPickerDialog(
+            title = "Timer sound",
+            current = settings.timers.soundUri,
+            onPick = { v -> onChange { it.copy(timers = it.timers.copy(soundUri = v)) } },
+            onDismiss = { showSounds = false },
+        )
     }
 
     ModalBottomSheet(
@@ -368,22 +368,8 @@ fun TimerSettingsSheet(
             SheetTitle("Timer settings")
             NavigateRow(
                 title = "Timer sound",
-                subtitle = when (val u = settings.timers.soundUri) {
-                    null -> "Default alarm sound"
-                    SILENT -> "Silent"
-                    else -> runCatching {
-                        RingtoneManager.getRingtone(context, Uri.parse(u))?.getTitle(context)
-                    }.getOrNull() ?: "Default alarm sound"
-                },
-                onClick = {
-                    picker.launch(
-                        Intent(RingtoneManager.ACTION_RINGTONE_PICKER)
-                            .putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
-                            .putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Timer sound")
-                            .putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
-                            .putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true)
-                    )
-                },
+                subtitle = soundName(context, settings.timers.soundUri),
+                onClick = { showSounds = true },
             )
             SwitchRow(
                 title = "Timer vibrate",
