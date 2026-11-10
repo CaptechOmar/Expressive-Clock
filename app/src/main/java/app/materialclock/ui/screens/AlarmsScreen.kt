@@ -120,7 +120,7 @@ private const val SWITCH_TOUCH_INSET_DP = 8f
 private const val DAY_CAP_DP = 23f
 /** Fixed, so the block is one width whatever the repeat pattern and the switch never shifts. */
 private const val DAY_BLOCK_DP = 82f
-private const val DAY_SHIFT_LEFT_DP = 16f
+private const val DAY_SHIFT_LEFT_DP = 6f
 /** The constant slice of space between letters. The scale is derived from it, not tuned. */
 private const val DAY_TRACKING_DP = 2.2f
 
