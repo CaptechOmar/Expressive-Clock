@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.alignByBaseline
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -70,6 +71,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.materialclock.ui.theme.ClockFace
 import app.materialclock.core.WorldCity
 import java.time.ZoneId
 import kotlin.math.PI
@@ -418,8 +420,8 @@ private fun CityRow(
             append("%d:%02d".format((local.hour % 12).takeIf { it != 0 } ?: 12, local.minute))
         }
         if (showSeconds) append(":%02d".format(local.second))
-        if (!use24h) append(if (local.hour < 12) "am" else "pm")
     }
+    val meridiem = if (use24h) null else if (local.hour < 12) "AM" else "PM"
 
     // A plain `remember`, not `rememberSwipeToDismissBoxState`.
     //
@@ -536,17 +538,45 @@ private fun CityRow(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Text(
-                clock,
-                style = if (showSeconds) {
-                    // Seconds add three glyphs to a row that was already tight at four.
-                    MaterialTheme.typography.titleLargeEmphasized
-                } else {
-                    MaterialTheme.typography.headlineMediumEmphasized
-                },
-                color = MaterialTheme.colorScheme.primary,
-                maxLines = 1,
+            // Google's clock face for the time, with AM/PM small beside it on the same baseline,
+            // the way Google's own world clock sets it, rather than lower-case on the end.
+            val digitStyle = (
+                if (showSeconds) MaterialTheme.typography.titleLargeEmphasized
+                else MaterialTheme.typography.headlineMediumEmphasized
+                ).copy(
+                fontFamily = ClockFace.family(
+                    opticalSize = if (showSeconds) 22f else 28f,
+                    width = ClockFace.READOUT_WIDTH,
+                    weight = 500,
+                    roundness = ClockFace.READOUT_ROUNDNESS,
+                ),
             )
+            val meridiemStyle = MaterialTheme.typography.labelLargeEmphasized.copy(
+                fontFamily = ClockFace.family(
+                    opticalSize = 14f,
+                    width = 100f,
+                    weight = 600,
+                    roundness = ClockFace.READOUT_ROUNDNESS,
+                ),
+            )
+            Row {
+                Text(
+                    clock,
+                    style = digitStyle,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    modifier = Modifier.alignByBaseline(),
+                )
+                if (meridiem != null) {
+                    Text(
+                        meridiem,
+                        style = meridiemStyle,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        modifier = Modifier.alignByBaseline().padding(start = 2.dp),
+                    )
+                }
+            }
         }
     }
     }
