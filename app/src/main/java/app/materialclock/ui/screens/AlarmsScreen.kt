@@ -28,6 +28,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFontFamilyResolver
 import androidx.compose.ui.text.AnnotatedString
@@ -341,6 +343,7 @@ private fun AlarmTile(
     BoxWithConstraints(Modifier.fillMaxWidth()) {
     val tileWidth = maxWidth
     val inset = CONTENT_INSET_DP.dp
+    val haptics = LocalHapticFeedback.current
     // Sized to fill the tile's **width**, which is the only dimension the grid fixes. `06:40` and
     // `11:22` are one width now that the figures are tabular, so this is one answer for the grid.
     val fit = fittedTime(meridiem = meridiem, tileWidth = tileWidth, target = inset)
@@ -466,7 +469,12 @@ private fun AlarmTile(
                         DayLetters(alarm, order, ink)
                         Switch(
                             checked = armed,
-                            onCheckedChange = { onToggle() },
+                            onCheckedChange = {
+                                haptics.performHapticFeedback(
+                                    if (it) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff,
+                                )
+                                onToggle()
+                            },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = container,
                                 checkedTrackColor = ink,

@@ -35,6 +35,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
@@ -140,6 +142,7 @@ private fun DockItem(tab: Tab, selected: Boolean, dark: Boolean, onClick: () -> 
     // seed, and on a real wallpaper that put a navy chip inside a yellow-green app. `primary` is
     // the one accent role guaranteed to be the colour the rest of the screen is already using.
     val scheme = MaterialTheme.colorScheme
+    val haptics = LocalHapticFeedback.current
     val container = when {
         !selected -> Color.Transparent
         dark -> scheme.primary
@@ -157,7 +160,14 @@ private fun DockItem(tab: Tab, selected: Boolean, dark: Boolean, onClick: () -> 
             .background(container)
             // Role.Tab and the selected state are supplied here because the component supplies
             // neither. Without these three lines the whole pattern is inaccessible.
-            .selectable(selected = selected, role = Role.Tab, onClick = onClick)
+            .selectable(
+                selected = selected,
+                role = Role.Tab,
+                onClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
+                    onClick()
+                },
+            )
             .defaultMinSize(minWidth = ITEM_HEIGHT)
             .padding(horizontal = if (selected) 16.dp else 14.dp),
         verticalAlignment = Alignment.CenterVertically,

@@ -340,9 +340,9 @@ private val BUTTON_GAP = 8.dp
 private val SECTION_GAP = 14.dp
 
 /** How much lower the lone Start button sits than the full stack's big button. */
-private val IDLE_DROP = 64.dp
+private val IDLE_DROP = 93.dp
 private val STOPPED_DROP = 48.dp
-private val STOPPED_LAPS_DROP = 20.dp
+private val STOPPED_LAPS_DROP = 35.dp
 private val RUNNING_DROP = 14.dp
 
 /** The big Stop button, when it is running with no laps, is this much of its full height. */

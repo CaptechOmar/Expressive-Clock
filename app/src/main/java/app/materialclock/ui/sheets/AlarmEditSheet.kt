@@ -49,6 +49,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -99,6 +101,7 @@ fun AlarmEditSheet(
     var label by rememberSaveable(initial.id) { mutableStateOf(initial.label) }
     var days by remember(initial.id) { mutableStateOf(initial.days) }
     var vibrate by rememberSaveable(initial.id) { mutableStateOf(initial.vibrate) }
+    val haptics = LocalHapticFeedback.current
     var soundUri by rememberSaveable(initial.id) { mutableStateOf(initial.soundUri) }
     var discard by remember(initial.id) { mutableStateOf(false) }
 
@@ -229,7 +232,12 @@ fun AlarmEditSheet(
                 // it is on, so it reads without relying on colour.
                 FilledIconToggleButton(
                     checked = vibrate,
-                    onCheckedChange = { vibrate = it },
+                    onCheckedChange = {
+                        haptics.performHapticFeedback(
+                            if (it) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff,
+                        )
+                        vibrate = it
+                    },
                     shapes = IconButtonDefaults.toggleableShapes(),
                     modifier = Modifier.size(ROW_H),
                 ) {

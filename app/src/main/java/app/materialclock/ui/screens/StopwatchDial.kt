@@ -7,8 +7,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.aspectRatio
@@ -24,8 +22,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
@@ -34,6 +33,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
+import app.materialclock.ui.luminousElasticClickable
 import app.materialclock.ui.theme.ClockFace
 import app.materialclock.ui.theme.Numerals
 import kotlin.math.PI
@@ -130,17 +130,20 @@ fun StopwatchDial(
                     scaleX = pop.value
                     scaleY = pop.value
                 }
-                .clip(shape)
-                .background(scheme.surfaceContainerHigh, shape)
-                .border(1.25.dp, scheme.outline.copy(alpha = 0.12f), shape)
-                .semantics { contentDescription = label }
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
+                // The light that follows the finger, the lean toward it and the spring back, ported
+                // from the other fork. It also takes the click: tapping the dial starts or stops.
+                .luminousElasticClickable(
+                    shape = shape,
+                    maxStretchPercent = 0.04f,
+                    maxTranslateDp = 2.dp,
+                    luminousRadiusScale = 0.58f,
                     role = Role.Button,
                     onClickLabel = if (running) "Stop" else "Start",
                     onClick = onToggle,
-                ),
+                )
+                .background(scheme.surfaceContainerHigh, shape)
+                .border(1.25.dp, scheme.outline.copy(alpha = 0.12f), shape)
+                .semantics { contentDescription = label },
             contentAlignment = Alignment.Center,
         ) {
             val quarter = scheme.primary.copy(alpha = 0.65f)
@@ -172,23 +175,41 @@ fun StopwatchDial(
                 val angle = handTurn * full - twelve
                 val dx = cos(angle)
                 val dy = sin(angle)
-                val tip = stadiumRadius(angle, a - 26.dp.toPx(), b - 26.dp.toPx())
+                val tip = stadiumRadius(angle, a - 29.dp.toPx(), b - 29.dp.toPx())
 
                 // Start the hand where it leaves the box around the readout, so it never crosses
                 // the digits.
-                val halfW = textWidth.toPx() / 2f + 14.dp.toPx()
-                val halfH = cap.toPx() / 2f + 14.dp.toPx()
+                val halfW = textWidth.toPx() / 2f + 17.dp.toPx()
+                val halfH = cap.toPx() / 2f + 17.dp.toPx()
                 val tx = if (abs(dx) > 1e-4f) halfW / abs(dx) else Float.MAX_VALUE
                 val ty = if (abs(dy) > 1e-4f) halfH / abs(dy) else Float.MAX_VALUE
                 val start = min(tx, ty)
 
                 if (tip > start) {
-                    drawLine(
-                        color = handColor,
-                        start = Offset(a + dx * start, b + dy * start),
-                        end = Offset(a + dx * tip, b + dy * tip),
-                        strokeWidth = 2.5.dp.toPx(),
-                        cap = StrokeCap.Round,
+                    // A wedge, full width at the tip and thinning to a point at the inner end, which
+                    // also fades out, rather than a line of one width that stops dead.
+                    val tipHalf = 1.4.dp.toPx()
+                    val innerHalf = 0.35.dp.toPx()
+                    val nx = -dy
+                    val ny = dx
+                    val sx = a + dx * start
+                    val sy = b + dy * start
+                    val ex = a + dx * tip
+                    val ey = b + dy * tip
+                    val wedge = Path().apply {
+                        moveTo(ex + nx * tipHalf, ey + ny * tipHalf)
+                        lineTo(ex - nx * tipHalf, ey - ny * tipHalf)
+                        lineTo(sx - nx * innerHalf, sy - ny * innerHalf)
+                        lineTo(sx + nx * innerHalf, sy + ny * innerHalf)
+                        close()
+                    }
+                    drawPath(
+                        path = wedge,
+                        brush = Brush.linearGradient(
+                            colors = listOf(handColor.copy(alpha = 0.2f), handColor),
+                            start = Offset(sx, sy),
+                            end = Offset(ex, ey),
+                        ),
                     )
                 }
                 drawCircle(handColor, 5.dp.toPx(), Offset(a + dx * tip, b + dy * tip))

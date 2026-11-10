@@ -15,6 +15,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
@@ -76,6 +79,9 @@ fun PillDial(
 ) {
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
+    // A detent under the finger for every value the hand lands on: twelve on the hours, sixty on
+    // the minutes, the minutes a lighter tick because they come five times as often.
+    val haptics = LocalHapticFeedback.current
 
     val dialColor = MaterialTheme.colorScheme.surfaceContainerHigh
     val ink = MaterialTheme.colorScheme.onSurface
@@ -101,13 +107,13 @@ fun PillDial(
                     if (minutes) "${state.minute} minutes" else "${state.hour} o'clock"
             }
             .pointerInput(minutes, rings) {
-                detectTapGestures { p -> apply(state, p, size.width.toFloat(), size.height.toFloat(), rings, minutes, onHourPicked) }
+                detectTapGestures { p -> apply(state, p, size.width.toFloat(), size.height.toFloat(), rings, minutes, onHourPicked, haptics) }
             }
             .pointerInput(minutes, rings) {
                 detectDragGestures(
                     onDragEnd = { if (!minutes) onHourPicked() },
                 ) { change, _ ->
-                    apply(state, change.position, size.width.toFloat(), size.height.toFloat(), rings, minutes, null)
+                    apply(state, change.position, size.width.toFloat(), size.height.toFloat(), rings, minutes, null, haptics)
                 }
             },
     ) {
@@ -264,6 +270,7 @@ private fun apply(
     rings: Int,
     minutes: Boolean,
     onHourPicked: (() -> Unit)?,
+    haptics: HapticFeedback,
 ) {
     val dx = at.x - w / 2f
     val dy = at.y - h / 2f
@@ -273,10 +280,14 @@ private fun apply(
     if (turns < 0f) turns += 1f
 
     if (minutes) {
-        state.minute = (turns * 60f).roundToInt() % 60
+        val next = (turns * 60f).roundToInt() % 60
+        if (next != state.minute) haptics.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
+        state.minute = next
     } else {
         val h12 = (turns * 12f).roundToInt() % 12
-        state.hour = if (rings == 2 && isInnerRing(at, w, h)) (h12 + 12) % 24 else h12
+        val next = if (rings == 2 && isInnerRing(at, w, h)) (h12 + 12) % 24 else h12
+        if (next != state.hour) haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+        state.hour = next
         onHourPicked?.invoke()
     }
 }
