@@ -119,7 +119,8 @@ private const val SWITCH_TOUCH_INSET_DP = 8f
 /** A little shorter than the switch's 32 dp track, because level with it reads as shouting. */
 private const val DAY_CAP_DP = 23f
 /** Fixed, so the block is one width whatever the repeat pattern and the switch never shifts. */
-private const val DAY_BLOCK_DP = 91f
+private const val DAY_BLOCK_DP = 82f
+private const val DAY_SHIFT_LEFT_DP = 16f
 /** The constant slice of space between letters. The scale is derived from it, not tuned. */
 private const val DAY_TRACKING_DP = 2.2f
 
@@ -454,7 +455,11 @@ private fun AlarmTile(
                     }
 
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = inset),
+                        // The day letters start [DAY_SHIFT_LEFT_DP] short of the inset, and the block
+                        // is a little narrower, so the last letter clears the switch instead of
+                        // running into it. The switch stays on the shared inset.
+                        modifier = Modifier.fillMaxWidth()
+                            .padding(start = inset - DAY_SHIFT_LEFT_DP.dp, end = inset),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
