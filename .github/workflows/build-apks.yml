@@ -61,7 +61,8 @@ jobs:
             -PclockStorePassword="$BETA_KEYSTORE_PASSWORD" \
             -PclockKeyAlias=beta \
             -PclockKeyPassword="$BETA_KEYSTORE_PASSWORD" \
-            -PclockBuild="${{ github.run_number }}"
+            -PclockBuild="$(( $(date +%s) / 60 ))" \
+            -PclockBetaNumber="${{ github.run_number }}"
 
       - name: Publish beta release
         if: env.BETA_KEYSTORE_BASE64 != ''

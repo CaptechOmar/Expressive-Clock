@@ -60,7 +60,7 @@ jobs:
             -PclockStorePassword="$KEYSTORE_PASSWORD" \
             -PclockKeyAlias=beta \
             -PclockKeyPassword="$KEYSTORE_PASSWORD" \
-            -PclockBuild="${{ github.run_number }}" \
+            -PclockBuild="$(( $(date +%s) / 60 ))" \
             -PclockVersion="${{ steps.v.outputs.version }}"
 
       - name: Publish release

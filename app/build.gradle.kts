@@ -4,7 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
-// Set by CI (`-PclockBuild=<run number>`); absent on a local build.
+// Set by CI (`-PclockBuild=<minutes since the epoch>`); absent on a local build.
 val clockBuild = (findProperty("clockBuild") as String?)?.toIntOrNull()
 
 android {
@@ -15,7 +15,7 @@ android {
         applicationId = "app.materialclock"
         minSdk = 26
         targetSdk = 36
-        // CI passes its run number as `clockBuild`, so every published beta has a higher version
+        // CI passes the time as `clockBuild`, so every published build has a higher version
         // code than the last and Android treats the next one as an update. Local builds get 1.
         versionCode = clockBuild ?: 1
         // CI passes the tag (v1.0.0 -> 1.0.0) as `clockVersion` for stable releases.
@@ -55,18 +55,15 @@ android {
         }
         /**
          * What gets published as a beta release: the optimised release build, signed with the one
-         * permanent key, under its own application id.
-         *
-         * The separate id (`.beta`) matters. It installs beside the debug build and beside any
-         * other copy of the app, and it keeps its own data, so updating a beta never touches them
-         * and they never block it. The permanent key matters more: Android only updates an app in
-         * place when the new APK is signed with the same key, and CI's own debug key is generated
-         * fresh on every run, which is why every earlier build had to be uninstalled first.
+         * permanent key, under the **same** application id as the stable release, so betas and
+         * stable builds update one another in place. That works because both are signed with the
+         * same key and both take their version code from the clock (minutes since the epoch), so
+         * the newer build always has the higher code whichever workflow made it. CI's own debug
+         * key is generated fresh on every run, which is why the debug builds could never update.
          */
         create("beta") {
             initWith(getByName("release"))
-            applicationIdSuffix = ".beta"
-            versionNameSuffix = "-beta" + (clockBuild?.let { ".$it" } ?: "")
+            versionNameSuffix = "-beta" + ((findProperty("clockBetaNumber") as String?)?.let { ".$it" } ?: "")
             matchingFallbacks += "release"
         }
         debug {
