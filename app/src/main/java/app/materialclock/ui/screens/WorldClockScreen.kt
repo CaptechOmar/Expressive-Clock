@@ -337,7 +337,9 @@ private fun CityDial(
             val len = r - 62.dp.toPx()
             val tip = Offset(c.x + cos(rad) * len, c.y + sin(rad) * len)
 
-            drawLine(accent, start = c, end = tip, strokeWidth = 2.dp.toPx())
+            // Day or night, in the same two colours as the badge beside the city in the list.
+            val tone = if (city.isNight(nowUtcMillis)) NIGHT_BADGE else DAY_BADGE
+            drawLine(tone, start = c, end = tip, strokeWidth = 2.dp.toPx())
 
             val m = measurer.measure(city.city, pillStyle)
             val padH = 7.dp.toPx()
@@ -348,13 +350,15 @@ private fun CityDial(
             val flip = if (angle.mod(360f) in 90f..270f) 180f else 0f
             rotate(degrees = angle + flip, pivot = tip) {
                 drawRoundRect(
-                    color = accent,
+                    color = tone,
                     topLeft = Offset(tip.x - w / 2f, tip.y - h / 2f),
                     size = Size(w, h),
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(h / 2f),
                 )
+                // Black on both, like the icons in the list.
                 drawText(
                     m,
+                    color = Color.Black,
                     topLeft = Offset(tip.x - m.size.width / 2f, tip.y - m.size.height / 2f),
                 )
             }
