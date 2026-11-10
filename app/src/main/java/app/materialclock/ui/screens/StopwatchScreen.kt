@@ -1,26 +1,29 @@
 package app.materialclock.ui.screens
 
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Pause
-import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -29,10 +32,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.SubcomposeLayout
-import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.util.lerp
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.materialclock.core.Lap
 import app.materialclock.core.Stopwatch
@@ -41,12 +44,18 @@ import app.materialclock.core.stopwatchParts
 /**
  * The stopwatch.
  *
- * The readout is an oval dial (see [StopwatchDial]) with a sweeping hand, and the wide pills sit
- * below it. The hundredths are why the whole screen is driven off a frame-paced ticker instead of
- * a one-second one.
+ * Top to bottom: the oval dial (see [StopwatchDial]), a horizontal strip of lap cards that only
+ * exists once there is a lap, and the buttons. Nothing scrolls vertically. The buttons take
+ * whatever height the dial and the lap strip leave, so everything always fits on the screen.
  *
- * The fastest and slowest laps are marked in tertiary and error. That is not in the renders; it is
- * the one addition, on the grounds that a lap list nobody can compare is just a receipt.
+ * The buttons follow Google's Clock:
+ *
+ *  - **Idle:** one big pill, *Start*, in the tertiary colour.
+ *  - **Running:** a big, squarer, red *Stop* with *Reset* and *Lap* under it.
+ *  - **Stopped:** *Start* again, with *Reset* under it, and no *Lap*.
+ *
+ * The three slots never move: the big button is always the same size and in the same place, and
+ * Reset and Lap fade into their own fixed slots.
  */
 @Composable
 fun StopwatchScreen(
@@ -60,18 +69,21 @@ fun StopwatchScreen(
 ) {
     val elapsed = stopwatch.elapsed(nowElapsedMillis)
     val (a, b, c) = elapsed.stopwatchParts()
-    val fastest = stopwatch.fastest
-    val slowest = stopwatch.slowest
+    val hasLaps = stopwatch.laps.isNotEmpty()
 
-    // Laps are prepended, and a keyed LazyColumn holds its scroll against the item it was already
-    // showing. Without this, every new lap is added *above* the viewport and the list silently
-    // keeps displaying the oldest three. Ride it back to the top instead.
-    val listState = rememberLazyListState()
-    LaunchedEffect(stopwatch.laps.size) {
-        if (stopwatch.laps.isNotEmpty()) listState.animateScrollToItem(0)
-    }
+    // The strip's band opens and closes, and the buttons below take up the difference.
+    val band by animateDpAsState(
+        targetValue = if (hasLaps) LAP_CARD_HEIGHT + SECTION_GAP else 0.dp,
+        animationSpec = spring(dampingRatio = 0.8f, stiffness = 400f),
+        label = "lapBand",
+    )
 
-    Column(modifier = modifier.fillMaxSize().padding(contentPadding)) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(contentPadding)
+            .padding(horizontal = 20.dp),
+    ) {
         Spacer(Modifier.height(12.dp))
 
         StopwatchDial(
@@ -81,298 +93,183 @@ fun StopwatchScreen(
             label = "Stopwatch, $a minutes $b seconds $c hundredths" +
                 if (stopwatch.running) ", running" else ", stopped",
             onToggle = onToggle,
-            modifier = Modifier.padding(horizontal = 20.dp),
         )
 
-        // The same 35 dp that separates mm from ss inside the readout. The readout's rows are
-        // ink-tight boxes, so this is a true ink gap and the button sits on the stack's own rhythm
-        // rather than at some other distance that happens to look close.
-        Spacer(Modifier.height(STACK_GAP))
-
-        // The control row is one height, always, so the band left for laps is the same on every
-        // frame of the screen's life: before the first press, mid-run, and after a reset. Nothing
-        // below the readout ever moves because of what is above it.
-        Column(modifier = Modifier.fillMaxWidth().weight(1f)) {
-            StopwatchControls(
-                idle = !stopwatch.running && elapsed.isZero,
-                running = stopwatch.running,
-                onToggle = onToggle,
-                onLap = onLap,
-                onReset = onReset,
-            )
-            Spacer(Modifier.height(14.dp))
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxWidth().weight(1f),
-                contentPadding = PaddingValues(horizontal = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(LAP_GAP),
-            ) {
-                items(stopwatch.laps, key = { it.index }) { lap ->
-                    LapRow(lap, fastest == lap.index, slowest == lap.index)
-                }
-            }
+        Spacer(Modifier.height(SECTION_GAP))
+        Box(Modifier.fillMaxWidth().height(band).clipToBounds()) {
+            LapStrip(stopwatch)
         }
+
+        StopwatchButtons(
+            running = stopwatch.running,
+            idle = !stopwatch.running && elapsed.isZero,
+            onToggle = onToggle,
+            onLap = onLap,
+            onReset = onReset,
+            modifier = Modifier.fillMaxWidth().weight(1f),
+        )
         Spacer(Modifier.height(10.dp))
     }
 }
 
 /**
- * The controls: **one row, one height, two states, and a morph between them.**
+ * Start/Stop, Reset and Lap, sized from the height they are given.
  *
- * Untouched, the screen offers only Start. Lap and Reset have nothing to act on yet, and a live
- * control that does nothing is worse than an absent one. It is sized to its own label, because a
- * lone button that spans the screen claims an importance the row does not have once it splits.
- *
- * Pressing it runs two phases, in order, and the order is the effect:
- *
- *  1. **Expand.** The pill grows from its content width to the full row on the expressive spatial
- *     spring. Its shape is already fully round, so growing the width *is* the morph; a small pill
- *     becomes a wide one with no corner interpolation to get wrong.
- *  2. **Split.** Only once it has arrived does the three-button row cross-fade in, with its 6 dp
- *     gaps opening from nothing. So the wide pill is seen to divide rather than to be replaced.
- *
- * The delay on phase 2 is what sequences them; running both on one curve reads as a dissolve.
- *
- * Both states are exactly [ROW_HEIGHT], and that is the whole point. An earlier version graded the
- * button heights down as laps accumulated to buy list space, which worked and looked wrong: the
- * controls twitched under the thumb on every lap press, and the band left for laps changed four
- * times. Fixing the height instead means nothing below the readout ever moves, and it makes the lap
- * band a constant, the same on a fresh screen as on a full one.
+ * The big button gets [MAIN_WEIGHT] parts and each of the other two gets one, which reproduces
+ * Google's proportions (about 137 dp over two 94 dp pills) on a tall screen and shrinks evenly
+ * on a short one. The sizes are worked out for the full three-button stack, so the big button
+ * stays put whether or not Reset and Lap are showing.
  */
 @Composable
-private fun StopwatchControls(
-    idle: Boolean,
+private fun StopwatchButtons(
     running: Boolean,
+    idle: Boolean,
     onToggle: () -> Unit,
     onLap: () -> Unit,
     onReset: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val expanded = !idle
-    // The *effects* spring, not the spatial one, and not by accident. Material's fast spatial
-    // spring is under-damped (0.6/800), which means it takes about 240 ms and rings past its
-    // target. Both properties are wrong here: the split is timed to land the moment the pill
-    // arrives, so the pill has to actually arrive rather than wobble around full width.
-    // `fastEffectsSpec` is critically damped and settles in well under half the time.
-    val expand by animateFloatAsState(
-        targetValue = if (expanded) 1f else 0f,
-        animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
-        label = "expand",
-    )
-    // The label goes almost at once. A word sliding along inside a container that is still growing
-    // reads as a glitch, so it is gone before the eye can follow it. The container it leaves
-    // behind is what the three buttons then divide.
-    val label by animateFloatAsState(
-        targetValue = if (expanded) 0f else 1f,
-        animationSpec = tween(durationMillis = LABEL_FADE_MS),
-        label = "label",
-    )
-    // Deliberately not a spring: this one has to *wait*, and a delay is a tween's parameter. It
-    // only waits on the way out, since collapsing back to Start should not stall on an empty row.
-    val split by animateFloatAsState(
-        targetValue = if (expanded) 1f else 0f,
-        animationSpec = tween(
-            durationMillis = SPLIT_MS,
-            delayMillis = if (expanded) EXPAND_LEAD_MS else 0,
-        ),
-        label = "split",
-    )
-    // The spring overshoots past 1 on the way in, which is wanted for the width but would push the
-    // interpolation out of range.
-    val e = expand.coerceIn(0f, 1f)
+    val scheme = MaterialTheme.colorScheme
+    BoxWithConstraints(modifier) {
+        val unit = ((maxHeight - BUTTON_GAP * 2) / (MAIN_WEIGHT + 2f)).coerceAtLeast(24.dp)
+        val mainHeight = unit * MAIN_WEIGHT
 
-    val startStop: @Composable (Boolean) -> Unit = { compact ->
-        WidePill(
-            text = if (running) "Stop" else "Start",
-            icon = if (running) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-            onClick = onToggle,
-            container = if (running) {
-                MaterialTheme.colorScheme.tertiaryContainer
-            } else {
-                MaterialTheme.colorScheme.primaryContainer
-            },
-            content = if (running) {
-                MaterialTheme.colorScheme.onTertiaryContainer
-            } else {
-                MaterialTheme.colorScheme.onPrimaryContainer
-            },
-            height = ROW_HEIGHT,
-            compact = compact,
+        val container by animateColorAsState(
+            if (running) STOP_RED else scheme.tertiaryContainer,
+            tween(200),
+            label = "mainContainer",
         )
-    }
+        val content by animateColorAsState(
+            if (running) STOP_RED_ON else scheme.onTertiaryContainer,
+            tween(200),
+            label = "mainContent",
+        )
+        // Fully round while it says Start; squarer while it says Stop.
+        val corner by animateDpAsState(
+            if (running) 30.dp else mainHeight / 2,
+            spring(dampingRatio = 0.75f, stiffness = 500f),
+            label = "mainCorner",
+        )
 
-    SubcomposeLayout(
-        Modifier.fillMaxWidth().height(ROW_HEIGHT).padding(horizontal = 20.dp),
-    ) { constraints ->
-        val full = constraints.maxWidth
-        val h = ROW_HEIGHT.roundToPx()
-
-        // The resting width is **one readout row**: the `: ss` line directly above it, colon cell
-        // and both digits. Measured off the real composable rather than added up from the cell
-        // constant and a guess at the digit advance, so the two stay locked together if the cap
-        // height or the width axis ever changes.
-        val inset = ROW_INK_INSET.roundToPx()
-        val rowWidth = subcompose("rowProbe") {
-            DigitRow(
-                part = "00",
-                capHeight = READOUT_CAP,
-                color = MaterialTheme.colorScheme.primary,
-                separator = true,
-            )
-        }.first().measure(Constraints()).width
-
-        // …but never narrower than the label needs. The two figures are within a few dp of each
-        // other today; if a translation ever made "Start" the longer of the two, clipping the word
-        // would be the worse failure.
-        val natural = subcompose("probe") {
+        Column(verticalArrangement = Arrangement.spacedBy(BUTTON_GAP)) {
             WidePill(
-                text = "Start",
-                icon = Icons.Rounded.PlayArrow,
-                onClick = {},
-                height = ROW_HEIGHT,
-                compact = true,
-                fillWidth = false,
-                contentPaddingH = IDLE_PADDING_H,
+                text = if (running) "Stop" else "Start",
+                onClick = onToggle,
+                container = container,
+                content = content,
+                shape = RoundedCornerShape(corner),
+                height = mainHeight,
             )
-        }.first().measure(Constraints(minHeight = h, maxHeight = h)).width
-
-        // A row's box begins `ROW_INK_INSET` left of its colon, so matching the box makes the
-        // button look off-centre: right edge flush with the digits, left edge hanging past the
-        // dots. Drop the inset and anchor the **right** edge to the row instead. That is the edge
-        // the eye actually checks, and it stays correct if the label clamp below widens the button
-        // leftwards.
-        val collapsedW = maxOf(rowWidth - inset, natural).coerceAtMost(full)
-        val collapsedX = ((full - rowWidth) / 2 + rowWidth - collapsedW).coerceAtLeast(0)
-
-        val w = lerp(collapsedW, full, e)
-        val x = lerp(collapsedX, 0, e)
-
-        val single = if (split < 1f) {
-            subcompose("single") {
-                Box(Modifier.graphicsLayer { alpha = 1f - split }) {
-                    // Always the *idle* button, never "Stop". `running` has already flipped by the
-                    // time this frame draws, and relabelling the pill at the instant of the tap
-                    // makes the thing that grows a different button from the one that was pressed.
-                    // The new labels belong to the split, which is what the split is for.
-                    WidePill(
-                        text = "Start",
-                        icon = Icons.Rounded.PlayArrow,
-                        onClick = onToggle,
-                        container = MaterialTheme.colorScheme.primaryContainer,
-                        content = MaterialTheme.colorScheme.onPrimaryContainer,
-                        height = ROW_HEIGHT,
-                        compact = true,
-                        contentPaddingH = IDLE_PADDING_H,
-                        contentAlpha = label,
-                    )
-                }
-            }.first().measure(Constraints.fixed(w, h))
-        } else {
-            null
-        }
-
-        val trio = if (split > 0f) {
-            subcompose("trio") {
-                Box(Modifier.graphicsLayer { alpha = split }) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(GAP * split)) {
-                        Box(Modifier.weight(1f)) {
-                            WidePill(text = "Lap", onClick = onLap, height = ROW_HEIGHT, compact = true)
-                        }
-                        Box(Modifier.weight(1f)) {
-                            WidePill(
-                                text = "Reset",
-                                onClick = onReset,
-                                outlined = true,
-                                content = MaterialTheme.colorScheme.onSurface,
-                                height = ROW_HEIGHT,
-                                compact = true,
-                            )
-                        }
-                        Box(Modifier.weight(1f)) { startStop(true) }
-                    }
-                }
-            }.first().measure(Constraints.fixed(full, h))
-        } else {
-            null
-        }
-
-        layout(full, h) {
-            single?.place(x, 0)
-            trio?.place(0, 0)
+            Slot(unit, visible = !idle) {
+                WidePill(
+                    text = "Reset",
+                    onClick = onReset,
+                    container = scheme.surfaceContainerHigh,
+                    content = scheme.onSurface,
+                    height = unit,
+                )
+            }
+            Slot(unit, visible = running) {
+                WidePill(
+                    text = "Lap",
+                    onClick = onLap,
+                    container = scheme.surfaceContainerHigh,
+                    content = scheme.onSurface,
+                    height = unit,
+                )
+            }
         }
     }
 }
 
-/** How long the pill has to finish growing before the row is allowed to divide. */
-private const val EXPAND_LEAD_MS = 95
-private const val SPLIT_MS = 150
-private const val LABEL_FADE_MS = 70
-
-/** Roomier than the three-abreast pills: this one is not fighting two neighbours for width. */
-private val IDLE_PADDING_H = 28.dp
-
-/** `StackedDigits` sets its rows 35 dp apart; the button sits on the same rhythm. */
-private val STACK_GAP = 35.dp
-
-/** Shared so the Start button can be measured against a row drawn at the same size. */
-private val READOUT_CAP = 66.dp
-
-private val GAP = 6.dp
-private val ROW_HEIGHT = 56.dp
+/** A fixed-height slot, so a button appearing never moves anything else. */
+@Composable
+private fun Slot(height: Dp, visible: Boolean, content: @Composable () -> Unit) {
+    Box(Modifier.fillMaxWidth().height(height)) {
+        AnimatedVisibility(
+            visible = visible,
+            enter = fadeIn(tween(160)) + scaleIn(initialScale = 0.92f),
+            exit = fadeOut(tween(100)),
+        ) { content() }
+    }
+}
 
 /**
- * Lap rows are deliberately shorter than a list item usually is. Every dp here buys list, and the
- * row carries three short strings (an index badge, a split and a total), none of which needs the
- * height a two-line item would. At [LAP_ROW_HEIGHT] plus [LAP_GAP] a lap costs 52 dp, so the
- * four-lap control layout shows three of them where the old 124 dp cap showed one.
+ * The laps, oldest on the left, as a row of cards that scrolls sideways. Three fit across; a
+ * fourth lap glides the row along, which is the only hint that it scrolls.
  */
-private val LAP_ROW_HEIGHT = 48.dp
-private val LAP_GAP = 4.dp
-
 @Composable
-private fun LapRow(lap: Lap, isFastest: Boolean, isSlowest: Boolean) {
-    val badge = when {
-        isFastest -> MaterialTheme.colorScheme.tertiaryContainer
-        isSlowest -> MaterialTheme.colorScheme.errorContainer
-        else -> MaterialTheme.colorScheme.surfaceContainerHighest
+private fun LapStrip(stopwatch: Stopwatch) {
+    val laps = stopwatch.laps.sortedBy { it.index }
+    val listState = rememberLazyListState()
+    LaunchedEffect(laps.size) {
+        if (laps.isNotEmpty()) listState.animateScrollToItem(laps.lastIndex)
     }
-    val onBadge = when {
-        isFastest -> MaterialTheme.colorScheme.onTertiaryContainer
-        isSlowest -> MaterialTheme.colorScheme.onErrorContainer
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val cardWidth = (maxWidth - LAP_GAP * 2) / 3
+        LazyRow(
+            state = listState,
+            modifier = Modifier.fillMaxWidth().height(LAP_CARD_HEIGHT),
+            horizontalArrangement = Arrangement.spacedBy(LAP_GAP),
+        ) {
+            items(laps, key = { it.index }) { lap ->
+                LapCard(
+                    lap = lap,
+                    isFastest = stopwatch.fastest == lap.index,
+                    isSlowest = stopwatch.slowest == lap.index,
+                    modifier = Modifier.width(cardWidth).fillMaxHeight(),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * One lap: index, split and running total. The fastest is a solid tertiary card, the slowest a
+ * solid red one, and the rest a solid primary one, all with dark text.
+ */
+@Composable
+private fun LapCard(lap: Lap, isFastest: Boolean, isSlowest: Boolean, modifier: Modifier = Modifier) {
+    val scheme = MaterialTheme.colorScheme
+    val container = when {
+        isFastest -> scheme.tertiaryContainer
+        isSlowest -> STOP_RED
+        else -> scheme.primaryContainer
+    }
+    val onContainer = when {
+        isFastest -> scheme.onTertiaryContainer
+        isSlowest -> STOP_RED_ON
+        else -> scheme.onPrimaryContainer
     }
     val (m, s, cs) = lap.split.stopwatchParts()
     val (tm, ts, tcs) = lap.total.stopwatchParts()
 
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        shape = RoundedCornerShape(percent = 50),
-        modifier = Modifier.fillMaxWidth().height(LAP_ROW_HEIGHT),
+        color = container,
+        contentColor = onContainer,
+        shape = RoundedCornerShape(24.dp),
+        modifier = modifier.semantics(mergeDescendants = true) {},
     ) {
-        Row(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Surface(color = badge, shape = CircleShape, modifier = Modifier.size(28.dp)) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        lap.index.toString(),
-                        style = MaterialTheme.typography.labelLargeEmphasized,
-                        color = onBadge,
-                    )
-                }
-            }
-            Text(
-                "$m:$s.$cs",
-                style = MaterialTheme.typography.titleMediumEmphasized,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                "$tm:$ts.$tcs",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Text("%02d".format(lap.index), style = MaterialTheme.typography.labelLargeEmphasized)
+            Text("$m:$s.$cs", style = MaterialTheme.typography.titleMediumEmphasized, maxLines = 1)
+            Text("$tm:$ts.$tcs", style = MaterialTheme.typography.bodyMedium, maxLines = 1)
         }
     }
 }
+
+/** The same red as the timer's Cancel, and Google's Stop. Dark text on it. */
+private val STOP_RED = Color(0xFFFF716C)
+private val STOP_RED_ON = Color(0xFF5C0A0A)
+
+/** Google's big button is about 1.46 times the height of the pills under it. */
+private const val MAIN_WEIGHT = 1.45f
+
+private val BUTTON_GAP = 8.dp
+private val SECTION_GAP = 14.dp
+private val LAP_GAP = 8.dp
+private val LAP_CARD_HEIGHT = 112.dp
