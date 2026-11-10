@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
@@ -78,6 +79,15 @@ fun StopwatchScreen(
         label = "lapBand",
     )
 
+    // With only the Start button on screen, it sits lower, further from the dial. It is an offset
+    // rather than a bigger gap so the button keeps its size and the other states do not change.
+    val idle = !stopwatch.running && elapsed.isZero
+    val idleDrop by animateDpAsState(
+        targetValue = if (idle) IDLE_DROP else 0.dp,
+        animationSpec = spring(dampingRatio = 0.8f, stiffness = 400f),
+        label = "idleDrop",
+    )
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -102,11 +112,11 @@ fun StopwatchScreen(
 
         StopwatchButtons(
             running = stopwatch.running,
-            idle = !stopwatch.running && elapsed.isZero,
+            idle = idle,
             onToggle = onToggle,
             onLap = onLap,
             onReset = onReset,
-            modifier = Modifier.fillMaxWidth().weight(1f),
+            modifier = Modifier.fillMaxWidth().weight(1f).offset(y = idleDrop),
         )
         Spacer(Modifier.height(10.dp))
     }
@@ -226,7 +236,7 @@ private fun LapStrip(stopwatch: Stopwatch) {
 
 /**
  * One lap: index, split and running total. The fastest is a solid tertiary card, the slowest a
- * solid red one, and the rest a solid primary one, all with dark text.
+ * solid red one with dark text, and the rest the same dark colour as the Reset and Lap buttons.
  */
 @Composable
 private fun LapCard(lap: Lap, isFastest: Boolean, isSlowest: Boolean, modifier: Modifier = Modifier) {
@@ -234,12 +244,12 @@ private fun LapCard(lap: Lap, isFastest: Boolean, isSlowest: Boolean, modifier: 
     val container = when {
         isFastest -> scheme.tertiaryContainer
         isSlowest -> STOP_RED
-        else -> scheme.primaryContainer
+        else -> scheme.surfaceContainerHigh
     }
     val onContainer = when {
         isFastest -> scheme.onTertiaryContainer
         isSlowest -> STOP_RED_ON
-        else -> scheme.onPrimaryContainer
+        else -> scheme.onSurface
     }
     val (m, s, cs) = lap.split.stopwatchParts()
     val (tm, ts, tcs) = lap.total.stopwatchParts()
@@ -271,5 +281,8 @@ private const val MAIN_WEIGHT = 1.45f
 
 private val BUTTON_GAP = 8.dp
 private val SECTION_GAP = 14.dp
+
+/** How much lower the lone Start button sits than the full stack's big button. */
+private val IDLE_DROP = 32.dp
 private val LAP_GAP = 8.dp
 private val LAP_CARD_HEIGHT = 112.dp
