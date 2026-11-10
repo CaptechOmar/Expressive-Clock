@@ -80,6 +80,7 @@ fun StopwatchScreen(
             text = if (elapsed.toHours() > 0) "$a:$b:$c" else "$a:$b.$c",
             label = "Stopwatch, $a minutes $b seconds $c hundredths" +
                 if (stopwatch.running) ", running" else ", stopped",
+            onToggle = onToggle,
             modifier = Modifier.padding(horizontal = 20.dp),
         )
 
