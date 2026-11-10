@@ -113,9 +113,9 @@ fun StopwatchDial(
         val refCap = 54.dp
         val refStyle = ClockFace.numerals(
             capHeight = refCap,
-            width = ClockFace.TIMER_WIDTH,
-            weight = ClockFace.TIMER_WEIGHT,
-            slashedZero = true,
+            width = ClockFace.READOUT_WIDTH,
+            weight = ClockFace.READOUT_WEIGHT,
+            roundness = ClockFace.READOUT_ROUNDNESS,
         )
         val refWidth = with(density) { measurer.measure("00:00.00", refStyle).size.width.toDp() }
         val maxText = dialWidth * 0.70f
@@ -198,9 +198,9 @@ fun StopwatchDial(
                 text = text,
                 capHeight = cap,
                 color = scheme.primary,
-                width = ClockFace.TIMER_WIDTH,
-                weight = ClockFace.TIMER_WEIGHT,
-                slashedZero = true,
+                width = ClockFace.READOUT_WIDTH,
+                weight = ClockFace.READOUT_WEIGHT,
+                roundness = ClockFace.READOUT_ROUNDNESS,
             )
         }
     }

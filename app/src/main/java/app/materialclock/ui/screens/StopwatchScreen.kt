@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import app.materialclock.core.Lap
 import app.materialclock.core.Stopwatch
 import app.materialclock.core.stopwatchParts
+import app.materialclock.ui.theme.ClockFace
 
 /**
  * The stopwatch.
@@ -253,6 +254,13 @@ private fun LapCard(lap: Lap, isFastest: Boolean, isSlowest: Boolean, modifier: 
     }
     val (m, s, cs) = lap.split.stopwatchParts()
     val (tm, ts, tcs) = lap.total.stopwatchParts()
+    // The same wide, round digits as the dial, so the laps read as part of the same display.
+    val digits = ClockFace.family(
+        opticalSize = 16f,
+        width = ClockFace.READOUT_WIDTH,
+        weight = 500,
+        roundness = ClockFace.READOUT_ROUNDNESS,
+    )
 
     Surface(
         color = container,
@@ -265,9 +273,20 @@ private fun LapCard(lap: Lap, isFastest: Boolean, isSlowest: Boolean, modifier: 
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text("%02d".format(lap.index), style = MaterialTheme.typography.labelLargeEmphasized)
-            Text("$m:$s.$cs", style = MaterialTheme.typography.titleMediumEmphasized, maxLines = 1)
-            Text("$tm:$ts.$tcs", style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+            Text(
+                "%02d".format(lap.index),
+                style = MaterialTheme.typography.labelLargeEmphasized.copy(fontFamily = digits),
+            )
+            Text(
+                "$m:$s.$cs",
+                style = MaterialTheme.typography.titleMediumEmphasized.copy(fontFamily = digits),
+                maxLines = 1,
+            )
+            Text(
+                "$tm:$ts.$tcs",
+                style = MaterialTheme.typography.bodyMedium.copy(fontFamily = digits),
+                maxLines = 1,
+            )
         }
     }
 }
@@ -283,6 +302,6 @@ private val BUTTON_GAP = 8.dp
 private val SECTION_GAP = 14.dp
 
 /** How much lower the lone Start button sits than the full stack's big button. */
-private val IDLE_DROP = 32.dp
+private val IDLE_DROP = 64.dp
 private val LAP_GAP = 8.dp
 private val LAP_CARD_HEIGHT = 112.dp

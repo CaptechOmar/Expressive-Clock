@@ -9,6 +9,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -238,31 +239,45 @@ private fun PresetPill(preset: TimerPreset, onClick: () -> Unit, onLongClick: ()
 private fun DraftReadout(hh: String, mm: String, ss: String) {
     val text = "$hh:$mm:$ss"
     val firstReal = text.indexOfFirst { it in '1'..'9' }.let { if (it < 0) text.length - 1 else it }
-    val cap = 56.dp
-    Row(
-        verticalAlignment = Alignment.Bottom,
-        modifier = Modifier.clearAndSetSemantics {
-            contentDescription = "$hh hours, $mm minutes, $ss seconds"
-        },
-    ) {
-        if (firstReal > 0) {
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        // Google's stopwatch digits are wide, so the readout is fitted to the width it has rather
+        // than fixed: full size if it fits, scaled down if not.
+        val refCap = 56.dp
+        val refStyle = ClockFace.numerals(
+            capHeight = refCap,
+            width = ClockFace.READOUT_WIDTH,
+            weight = ClockFace.READOUT_WEIGHT,
+            roundness = ClockFace.READOUT_ROUNDNESS,
+        )
+        val refWidth = with(density) { measurer.measure(text, refStyle).size.width.toDp() }
+        val cap = if (refWidth <= maxWidth) refCap else refCap * (maxWidth / refWidth)
+        Row(
+            verticalAlignment = Alignment.Bottom,
+            modifier = Modifier.clearAndSetSemantics {
+                contentDescription = "$hh hours, $mm minutes, $ss seconds"
+            },
+        ) {
+            if (firstReal > 0) {
+                Numerals(
+                    text = text.take(firstReal),
+                    capHeight = cap,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.32f),
+                    width = ClockFace.READOUT_WIDTH,
+                    weight = ClockFace.READOUT_WEIGHT,
+                    roundness = ClockFace.READOUT_ROUNDNESS,
+                )
+            }
             Numerals(
-                text = text.take(firstReal),
+                text = text.drop(firstReal),
                 capHeight = cap,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.32f),
-                width = ClockFace.TIMER_WIDTH,
-                weight = ClockFace.TIMER_WEIGHT,
-                slashedZero = true,
+                color = MaterialTheme.colorScheme.onSurface,
+                width = ClockFace.READOUT_WIDTH,
+                weight = ClockFace.READOUT_WEIGHT,
+                roundness = ClockFace.READOUT_ROUNDNESS,
             )
         }
-        Numerals(
-            text = text.drop(firstReal),
-            capHeight = cap,
-            color = MaterialTheme.colorScheme.onSurface,
-            width = ClockFace.TIMER_WIDTH,
-            weight = ClockFace.TIMER_WEIGHT,
-            slashedZero = true,
-        )
     }
 }
 

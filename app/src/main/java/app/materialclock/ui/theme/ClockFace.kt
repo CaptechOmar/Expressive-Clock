@@ -77,6 +77,16 @@ object ClockFace {
     const val TIMER_WEIGHT = 490
 
     /**
+     * The big readouts that match Google's own stopwatch: the stopwatch dial, the timer's keypad
+     * readout and the lap cards. Measured off a screenshot of it (1080 px wide): a `0` 115 px wide
+     * and 141 px tall (ink width 0.82 of the height) with a 23 px stem (0.16). Solved against the
+     * font with a plain zero and fully round stroke ends; both axes are tunable.
+     */
+    const val READOUT_WIDTH = 107f
+    const val READOUT_WEIGHT = 530
+    const val READOUT_ROUNDNESS = 100f
+
+    /**
      * The running timer's countdown, measured off a screen recording of Google's own Clock timer
      * (frames at 1080 px wide): digits 150 px tall, a `0` 82 px wide with a 13 px stem. That is an
      * ink width of 0.55 of the height and a stem of 0.087 of it, so noticeably lighter and
