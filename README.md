@@ -3,7 +3,7 @@
 
 ![Alarms, the timer keypad, Stopwatch, World Clock, a running timer and the alarm editor, across several themes](docs/screenshots.png)
 
-App #2 in the suite. A real Compose app, not a mockup: it builds, installs and runs.
+A real Compose app, not a mockup: it builds, installs and runs.
 
 It is a recreation of the M3 Expressive research-concept clock, meaning the unshipped one from
 Google's 46-study programme rather than Google Clock 8.8. Source renders and the measurements taken
