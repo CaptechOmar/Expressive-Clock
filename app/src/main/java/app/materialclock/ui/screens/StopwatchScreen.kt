@@ -35,6 +35,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -73,6 +75,24 @@ fun StopwatchScreen(
     val (a, b, c) = elapsed.stopwatchParts()
     val hasLaps = stopwatch.laps.isNotEmpty()
 
+    // A tick for every press. Start and Stop (and a tap on the dial, which does the same thing) are
+    // an "on" and an "off", Lap is a click, and Reset is the heavier one.
+    val haptics = LocalHapticFeedback.current
+    val toggle: () -> Unit = {
+        haptics.performHapticFeedback(
+            if (stopwatch.running) HapticFeedbackType.ToggleOff else HapticFeedbackType.ToggleOn,
+        )
+        onToggle()
+    }
+    val lap: () -> Unit = {
+        haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
+        onLap()
+    }
+    val reset: () -> Unit = {
+        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+        onReset()
+    }
+
     // The strip's band opens and closes, and the buttons below take up the difference.
     val band by animateDpAsState(
         targetValue = if (hasLaps) LAP_CARD_HEIGHT + SECTION_GAP else 0.dp,
@@ -83,8 +103,16 @@ fun StopwatchScreen(
     // With only the Start button on screen, it sits lower, further from the dial. It is an offset
     // rather than a bigger gap so the button keeps its size and the other states do not change.
     val idle = !stopwatch.running && elapsed.isZero
+    val drop = when {
+        idle -> IDLE_DROP
+        // Stopped with Start and Reset: nearly as far from the dial as when only Start shows, and
+        // a little further from the laps when there are some.
+        !stopwatch.running && !hasLaps -> STOPPED_DROP
+        !stopwatch.running -> STOPPED_LAPS_DROP
+        else -> 0.dp
+    }
     val idleDrop by animateDpAsState(
-        targetValue = if (idle) IDLE_DROP else 0.dp,
+        targetValue = drop,
         animationSpec = spring(dampingRatio = 0.8f, stiffness = 400f),
         label = "idleDrop",
     )
@@ -103,7 +131,7 @@ fun StopwatchScreen(
             text = if (elapsed.toHours() > 0) "$a:$b:$c" else "$a:$b.$c",
             label = "Stopwatch, $a minutes $b seconds $c hundredths" +
                 if (stopwatch.running) ", running" else ", stopped",
-            onToggle = onToggle,
+            onToggle = toggle,
         )
 
         Spacer(Modifier.height(SECTION_GAP))
@@ -114,9 +142,10 @@ fun StopwatchScreen(
         StopwatchButtons(
             running = stopwatch.running,
             idle = idle,
-            onToggle = onToggle,
-            onLap = onLap,
-            onReset = onReset,
+            compact = !hasLaps,
+            onToggle = toggle,
+            onLap = lap,
+            onReset = reset,
             modifier = Modifier.fillMaxWidth().weight(1f).offset(y = idleDrop),
         )
         Spacer(Modifier.height(10.dp))
@@ -135,6 +164,7 @@ fun StopwatchScreen(
 private fun StopwatchButtons(
     running: Boolean,
     idle: Boolean,
+    compact: Boolean,
     onToggle: () -> Unit,
     onLap: () -> Unit,
     onReset: () -> Unit,
@@ -143,7 +173,13 @@ private fun StopwatchButtons(
     val scheme = MaterialTheme.colorScheme
     BoxWithConstraints(modifier) {
         val unit = ((maxHeight - BUTTON_GAP * 2) / (MAIN_WEIGHT + 2f)).coerceAtLeast(24.dp)
-        val mainHeight = unit * MAIN_WEIGHT
+        val fullHeight = unit * MAIN_WEIGHT
+        // Running with no laps there is room to spare, so Stop is a little smaller.
+        val mainHeight by animateDpAsState(
+            if (running && compact) fullHeight * RUNNING_NO_LAPS_SCALE else fullHeight,
+            spring(dampingRatio = 0.8f, stiffness = 400f),
+            label = "mainHeight",
+        )
 
         val container by animateColorAsState(
             if (running) STOP_RED else scheme.tertiaryContainer,
@@ -303,5 +339,10 @@ private val SECTION_GAP = 14.dp
 
 /** How much lower the lone Start button sits than the full stack's big button. */
 private val IDLE_DROP = 64.dp
+private val STOPPED_DROP = 48.dp
+private val STOPPED_LAPS_DROP = 20.dp
+
+/** The big Stop button, when it is running with no laps, is this much of its full height. */
+private const val RUNNING_NO_LAPS_SCALE = 0.85f
 private val LAP_GAP = 8.dp
 private val LAP_CARD_HEIGHT = 112.dp

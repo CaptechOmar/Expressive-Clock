@@ -45,7 +45,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -93,6 +95,21 @@ fun TimersScreen(
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
+    // One tick for every press on this page. The kind says what happened: a key press, a start
+    // (on), a stop or pause (off), a nudge (+10 s) or a cancel.
+    val haptics = LocalHapticFeedback.current
+    val tick: (HapticFeedbackType, () -> Unit) -> () -> Unit = { type, action ->
+        {
+            haptics.performHapticFeedback(type)
+            action()
+        }
+    }
+    val digit: (Char) -> Unit = { c ->
+        haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
+        onDigit(c)
+    }
+    val pausing = timer?.state == TimerState.RUNNING
+
     AnimatedContent(
         targetState = timer != null,
         transitionSpec = { fadeIn() togetherWith fadeOut() },
@@ -100,9 +117,24 @@ fun TimersScreen(
         modifier = modifier.fillMaxSize().padding(contentPadding),
     ) { running ->
         if (running && timer != null) {
-            RunningTimer(timer, nowElapsedMillis, onPauseResume, onAddTen, onCancel)
+            RunningTimer(
+                timer,
+                nowElapsedMillis,
+                tick(if (pausing) HapticFeedbackType.ToggleOff else HapticFeedbackType.ToggleOn, onPauseResume),
+                tick(HapticFeedbackType.ContextClick, onAddTen),
+                tick(HapticFeedbackType.Reject, onCancel),
+            )
         } else {
-            SetTimer(draft, presets, onDigit, onBackspace, onWind, onStart, onPreset, onEditPreset)
+            SetTimer(
+                draft,
+                presets,
+                digit,
+                tick(HapticFeedbackType.VirtualKey, onBackspace),
+                onWind,
+                tick(HapticFeedbackType.ToggleOn, onStart),
+                onPreset,
+                onEditPreset,
+            )
         }
     }
 }
