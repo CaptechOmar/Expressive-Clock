@@ -109,6 +109,8 @@ fun StopwatchScreen(
         // a little further from the laps when there are some.
         !stopwatch.running && !hasLaps -> STOPPED_DROP
         !stopwatch.running -> STOPPED_LAPS_DROP
+        // Running with no laps: Stop is the smaller one, so it sits a touch lower.
+        !hasLaps -> RUNNING_DROP
         else -> 0.dp
     }
     val idleDrop by animateDpAsState(
@@ -341,6 +343,7 @@ private val SECTION_GAP = 14.dp
 private val IDLE_DROP = 64.dp
 private val STOPPED_DROP = 48.dp
 private val STOPPED_LAPS_DROP = 20.dp
+private val RUNNING_DROP = 14.dp
 
 /** The big Stop button, when it is running with no laps, is this much of its full height. */
 private const val RUNNING_NO_LAPS_SCALE = 0.85f
