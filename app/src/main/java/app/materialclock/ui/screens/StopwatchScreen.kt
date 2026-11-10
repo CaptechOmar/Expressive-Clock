@@ -21,7 +21,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -42,10 +41,9 @@ import app.materialclock.core.stopwatchParts
 /**
  * The stopwatch.
  *
- * Extrapolated: the concept set contains no stopwatch at all, so this reuses the timer's own
- * vocabulary (the stacked hollow digits, the wide pills) rather than importing a different look.
- * The bottom pair of digits is hundredths, which is why the whole screen is driven off a
- * frame-paced ticker instead of a one-second one.
+ * The readout is an oval dial (see [StopwatchDial]) with a sweeping hand, and the wide pills sit
+ * below it. The hundredths are why the whole screen is driven off a frame-paced ticker instead of
+ * a one-second one.
  *
  * The fastest and slowest laps are marked in tertiary and error. That is not in the renders; it is
  * the one addition, on the grounds that a lap list nobody can compare is just a receipt.
@@ -76,11 +74,10 @@ fun StopwatchScreen(
     Column(modifier = modifier.fillMaxSize().padding(contentPadding)) {
         Spacer(Modifier.height(12.dp))
 
-        StackedDigits(
-            parts = listOf(a, b, c),
-            capHeight = READOUT_CAP,
-            color = MaterialTheme.colorScheme.primary,
-            leading = Icons.Rounded.Timer,
+        StopwatchDial(
+            elapsedMillis = elapsed.toMillis(),
+            running = stopwatch.running,
+            text = if (elapsed.toHours() > 0) "$a:$b:$c" else "$a:$b.$c",
             label = "Stopwatch, $a minutes $b seconds $c hundredths" +
                 if (stopwatch.running) ", running" else ", stopped",
             modifier = Modifier.padding(horizontal = 20.dp),
