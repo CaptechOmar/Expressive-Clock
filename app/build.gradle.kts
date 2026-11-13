@@ -12,7 +12,7 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "app.materialclock"
+        applicationId = "com.captechomar.clock"
         minSdk = 26
         targetSdk = 36
         // CI passes the time as `clockBuild`, so every published build has a higher version

@@ -1,6 +1,6 @@
 name: Stable release
 
-# Publishes a normal, non-beta release under the real application id (app.materialclock).
+# Publishes a normal, non-beta release under the real application id (com.captechomar.clock).
 # Trigger it by pushing a tag like v1.0.0, or from the Actions tab with a version number.
 on:
   push:
