@@ -69,7 +69,10 @@ jobs:
         run: |
           v="${{ steps.v.outputs.version }}"
           cp app/build/outputs/apk/release/*.apk "expressive-clock-$v.apk"
-          gh release create "v$v" "expressive-clock-$v.apk" \
+          # A second copy under a fixed name, so releases/latest/download/expressive-clock.apk
+          # always points at the newest stable APK (the README badge uses it).
+          cp "expressive-clock-$v.apk" expressive-clock.apk
+          gh release create "v$v" "expressive-clock-$v.apk" expressive-clock.apk \
             --target "$GITHUB_SHA" \
             --title "Expressive Clock $v" \
             --generate-notes
