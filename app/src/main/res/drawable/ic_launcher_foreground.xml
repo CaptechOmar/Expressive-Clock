@@ -39,4 +39,16 @@
             </gradient>
         </aapt:attr>
     </path>
+    <!-- Clock hands, measured off the reference render in units of the front disc's radius
+         (r 22.14): hub at (53.63, 53.51) r 3.3, hour hand to (44.93, 47.21), minute hand to
+         (66.04, 44.44), both 5 dp round-capped strokes. -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M44.93,47.21 L53.63,53.51 L66.04,44.44" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M53.63,53.51 m-3.3,0 a3.3,3.3 0 1,0 6.6,0 a3.3,3.3 0 1,0 -6.6,0 Z" />
 </vector>
