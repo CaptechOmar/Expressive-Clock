@@ -12,6 +12,13 @@ off them are in `../clock-mockups/reference/concept/`.
 Four tabs: Alarms · World Clock · Timers · Stopwatch. The concept has three (Alarms, Map, Settings)
 and no stopwatch, so two of these are extrapolated.
 
+## Install
+
+[<img src="https://raw.githubusercontent.com/NeoApplications/Neo-Backup/034b226cea5c1b30eb4f6a6f313e4dadcbb0ece4/badge_github.png" alt="Get it on GitHub" height="80">](https://github.com/CaptechOmar/Expressive-Clock/releases/latest)
+
+Opens the latest stable release, where the APK is listed under Assets. Betas are marked
+pre-release and are not offered here.
+
 ## Features
 
 **Alarms**
