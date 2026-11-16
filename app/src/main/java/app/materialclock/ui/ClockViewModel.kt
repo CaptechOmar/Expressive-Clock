@@ -124,13 +124,38 @@ class ClockViewModel(app: Application) : AndroidViewModel(app) {
 
     /* ── Alarms ─────────────────────────────────────────────────────────────────────────────── */
 
+    private val _alarmNotices = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 4)
+
+    /** One-line "rings in …" messages for the UI to float as a snackbar. */
+    val alarmNotices: kotlinx.coroutines.flow.SharedFlow<String> = _alarmNotices
+
+    private fun announce(alarm: Alarm) {
+        val fire = alarm.nextFire(java.time.ZonedDateTime.now()) ?: return
+        val mins = (java.time.Duration.between(java.time.ZonedDateTime.now(), fire).seconds + 59) / 60
+        val d = mins / 1440
+        val h = (mins % 1440) / 60
+        val m = mins % 60
+        fun unit(n: Long, w: String) = "$n $w" + if (n == 1L) "" else "s"
+        val parts = buildList {
+            if (d > 0) add(unit(d, "day"))
+            if (h > 0) add(unit(h, "hour"))
+            if (m > 0 || isEmpty()) add(unit(m, "minute"))
+        }
+        _alarmNotices.tryEmit("Alarm set for ${parts.joinToString(" ")} from now")
+    }
+
     fun toggleAlarm(id: Long) = viewModelScope.launch {
         val next = store.alarmsNow().map {
             if (it.id == id) it.copy(enabled = !it.enabled, snoozedUntilMillis = null) else it
         }
         store.putAlarms(next)
         next.firstOrNull { it.id == id }?.let { a ->
-            if (a.enabled) AlarmScheduler.schedule(ctx, a) else AlarmScheduler.cancel(ctx, id)
+            if (a.enabled) {
+                AlarmScheduler.schedule(ctx, a)
+                announce(a)
+            } else {
+                AlarmScheduler.cancel(ctx, id)
+            }
         }
     }
 
@@ -146,6 +171,7 @@ class ClockViewModel(app: Application) : AndroidViewModel(app) {
         }
         store.putAlarms(next.sortedWith(compareBy({ it.time.hour }, { it.time.minute })))
         AlarmScheduler.schedule(ctx, alarm)
+        if (alarm.enabled) announce(alarm)
     }
 
     fun deleteAlarm(id: Long) = viewModelScope.launch {

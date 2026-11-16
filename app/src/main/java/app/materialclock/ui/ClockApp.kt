@@ -127,6 +127,14 @@ fun ClockApp(startTab: String? = null, vm: ClockViewModel = viewModel()) {
         val snackbar = remember { SnackbarHostState() }
         val scope = rememberCoroutineScope()
 
+        // "Alarm set for 7 hours 32 minutes from now", floated whenever an alarm is armed.
+        LaunchedEffect(Unit) {
+            vm.alarmNotices.collect { msg ->
+                snackbar.currentSnackbarData?.dismiss()
+                scope.launch { snackbar.showSnackbar(msg, duration = SnackbarDuration.Short) }
+            }
+        }
+
         // Asked once, on first composition. Denying it costs the notifications and nothing else.
         // The alarm still rings, because the ringer is a foreground service and audio, not a post.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
