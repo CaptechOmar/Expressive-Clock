@@ -6,6 +6,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.PrivacyTip
+import androidx.compose.material.icons.rounded.Security
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -38,32 +42,39 @@ import app.materialclock.BuildConfig
  *    binaries and that carries obligations.
  */
 @Composable
-fun AboutRows() {
-    var open by remember { mutableStateOf<AboutPage?>(null) }
+fun AboutPage(onBack: () -> Unit) {
+    var open by remember { mutableStateOf<AboutPage2?>(null) }
 
-    SectionLabel("About")
-    NavigateRow(
-        title = "Privacy",
-        subtitle = "No accounts, no telemetry, no network",
-        onClick = { open = AboutPage.PRIVACY },
-    )
-    NavigateRow(
-        title = "Permissions",
-        subtitle = "What each one is for",
-        onClick = { open = AboutPage.PERMISSIONS },
-    )
-    NavigateRow(
-        title = "Licences",
-        subtitle = "Fonts and libraries",
-        onClick = { open = AboutPage.LICENCES },
-    )
-    Text(
-        "Clock ${BuildConfig.VERSION_NAME}",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        textAlign = TextAlign.Center,
-        modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 16.dp),
-    )
+    SettingsPage("About app", onBack) {
+        SettingsLabel("About")
+        SettingsGroup {
+            row { s ->
+                SettingsRow(
+                    s, Icons.Rounded.PrivacyTip, "Privacy", "No accounts, no telemetry, no network",
+                    onClick = { open = AboutPage2.PRIVACY },
+                )
+            }
+            row { s ->
+                SettingsRow(
+                    s, Icons.Rounded.Security, "Permissions", "What each one is for",
+                    onClick = { open = AboutPage2.PERMISSIONS },
+                )
+            }
+            row { s ->
+                SettingsRow(
+                    s, Icons.Rounded.Description, "Licences", "Fonts and libraries",
+                    onClick = { open = AboutPage2.LICENCES },
+                )
+            }
+        }
+        Text(
+            "Clock ${BuildConfig.VERSION_NAME}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 24.dp),
+        )
+    }
 
     open?.let { page ->
         AlertDialog(
@@ -84,7 +95,7 @@ fun AboutRows() {
     }
 }
 
-private enum class AboutPage(val title: String, val body: List<String>) {
+private enum class AboutPage2(val title: String, val body: List<String>) {
 
     PRIVACY(
         "Privacy",
@@ -102,8 +113,9 @@ private enum class AboutPage(val title: String, val body: List<String>) {
             "Android's own backup may copy that file to your Google account if you have device " +
                 "backup switched on. That is a setting you control, in Settings › Google › Backup, " +
                 "and it is the only way any of this data leaves the phone.",
-            "Alarm sounds are played from the ringtones already on your device. Choosing one " +
-                "records which sound you picked, nothing more.",
+            "Alarm sounds are played from the ringtones already on your device, or from an audio " +
+                "file you pick with Add new. Choosing one records which sound you picked, and " +
+                "nothing is copied or uploaded.",
         ),
     ),
 
