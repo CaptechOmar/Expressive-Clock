@@ -79,6 +79,8 @@ fun AboutPage(onBack: () -> Unit) {
     open?.let { page ->
         AlertDialog(
             onDismissRequest = { open = null },
+            modifier = Modifier.fillMaxWidth(0.8f),
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
             confirmButton = { TextButton(onClick = { open = null }) { Text("Close") } },
             title = { Text(page.title) },
             text = {

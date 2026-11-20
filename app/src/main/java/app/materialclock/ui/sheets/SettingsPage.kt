@@ -202,28 +202,59 @@ fun <T> SettingsChoice(
     if (open) {
         AlertDialog(
             onDismissRequest = { open = false },
+            // Not the platform default width, which is nearly edge to edge on a phone.
+            modifier = Modifier.fillMaxWidth(0.8f),
+            properties = DialogProperties(usePlatformDefaultWidth = false),
             confirmButton = { TextButton(onClick = { open = false }) { Text("Cancel") } },
             title = { Text(title) },
             text = {
-                Column(Modifier.selectableGroup()) {
-                    options.forEach { option ->
+                Column(
+                    Modifier.selectableGroup().verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
+                    options.forEachIndexed { i, option ->
+                        val picked = option == value
+                        val big = 20.dp
+                        val small = 5.dp
+                        val shape = RoundedCornerShape(
+                            topStart = if (i == 0) big else small,
+                            topEnd = if (i == 0) big else small,
+                            bottomStart = if (i == options.lastIndex) big else small,
+                            bottomEnd = if (i == options.lastIndex) big else small,
+                        )
                         Row(
                             Modifier
                                 .fillMaxWidth()
+                                .clip(shape)
+                                .background(
+                                    if (picked) {
+                                        MaterialTheme.colorScheme.primaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.surfaceContainerHighest
+                                    }
+                                )
                                 .selectable(
-                                    selected = option == value,
+                                    selected = picked,
                                     role = Role.RadioButton,
                                     onClick = {
                                         onSelect(option)
                                         open = false
                                     },
                                 )
-                                .padding(vertical = 10.dp),
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            RadioButton(selected = option == value, onClick = null)
-                            Text(label(option), style = MaterialTheme.typography.bodyLarge)
+                            RadioButton(selected = picked, onClick = null)
+                            Text(
+                                label(option),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = if (picked) {
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                },
+                            )
                         }
                     }
                 }
