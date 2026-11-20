@@ -28,7 +28,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Surface
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -53,33 +54,16 @@ import androidx.compose.ui.window.DialogProperties
  * large title, then sections of rounded cards. Cards in a section are separated by a hairline gap,
  * the first and last get large outer corners and the ones between get small ones.
  */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsPage(title: String, onBack: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
-    Dialog(
+    ModalBottomSheet(
         onDismissRequest = onBack,
-        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
-        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-            Column(
-                Modifier
-                    .statusBarsPadding()
-                    .navigationBarsPadding()
-                    .verticalScroll(rememberScrollState()),
-            ) {
-                IconButton(onClick = onBack, modifier = Modifier.padding(start = 8.dp, top = 8.dp)) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
-                }
-                Spacer(Modifier.height(40.dp))
-                Text(
-                    title,
-                    style = MaterialTheme.typography.displaySmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(horizontal = 24.dp),
-                )
-                Spacer(Modifier.height(12.dp))
-                content()
-                Spacer(Modifier.height(32.dp))
-            }
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = 32.dp)) {
+            SheetTitle(title)
+            content()
         }
     }
 }
@@ -91,7 +75,7 @@ fun SettingsLabel(text: String) {
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 10.dp),
+        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 8.dp),
     )
 }
 
@@ -140,7 +124,7 @@ fun SettingsRow(
         Modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .let { if (onClick != null) it.clickable(role = role, onClick = onClick) else it }
             .padding(horizontal = 20.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,

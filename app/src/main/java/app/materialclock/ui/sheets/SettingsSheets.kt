@@ -161,7 +161,7 @@ fun StopwatchSettingsSheet(
                     Modifier
                         .fillMaxWidth()
                         .clip(s)
-                        .background(MaterialTheme.colorScheme.surfaceContainer),
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh),
                 ) {
                     PaletteRow(
                         dynamic = settings.theme.dynamicColor,
@@ -198,7 +198,7 @@ fun StopwatchSettingsSheet(
             row { s ->
                 SettingsRow(
                     s, Icons.Rounded.Info, "About app",
-                    "Privacy, permissions, licences and version",
+                    "Privacy, licenses and more",
                     onClick = { about = true },
                 )
             }
