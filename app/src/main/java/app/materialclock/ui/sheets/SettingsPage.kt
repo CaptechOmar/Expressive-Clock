@@ -203,7 +203,7 @@ fun <T> SettingsChoice(
         AlertDialog(
             onDismissRequest = { open = false },
             // Not the platform default width, which is nearly edge to edge on a phone.
-            modifier = Modifier.fillMaxWidth(0.8f),
+            modifier = Modifier.fillMaxWidth(0.9f),
             properties = DialogProperties(usePlatformDefaultWidth = false),
             confirmButton = { TextButton(onClick = { open = false }) { Text("Cancel") } },
             title = { Text(title) },
