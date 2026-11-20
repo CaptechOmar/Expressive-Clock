@@ -245,7 +245,17 @@ fun <T> SettingsChoice(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            RadioButton(selected = picked, onClick = null)
+                            RadioButton(
+                                selected = picked,
+                                onClick = null,
+                                colors = if (picked) {
+                                    androidx.compose.material3.RadioButtonDefaults.colors(
+                                        selectedColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    )
+                                } else {
+                                    androidx.compose.material3.RadioButtonDefaults.colors()
+                                },
+                            )
                             Text(
                                 label(option),
                                 style = MaterialTheme.typography.bodyLarge,
